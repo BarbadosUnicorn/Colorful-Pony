@@ -14,13 +14,14 @@ def pony_color_determinator(file_obj):    # Чтение csv через csv.Dict
             response = 'It`s %s!' %line['pony_name']
 
     print(response)
+    #input()    # Если после ввода цвета все быстро закрывается - раскомментируй эту строчку.
 
 
 
 
 
 if __name__ == "__main__":
-    with open("C:/Users/Nikita/PycharmProjects/ColorfulPony/pony_color_database.csv") as f_obj:
+    with open("pony_color_database.csv") as f_obj:
         pony_color_determinator(f_obj)    # Вызываем функцию
 
     f_obj.closed
