@@ -32,14 +32,14 @@ def pony_color_determinator():
     color = input()    # Вводим цвет
     # Prepare a cursor object using cursor() method
     cursor = db.cursor()
+    q = db.escape(color)    # First part of SQL injection protection
     # Prepare SQL query to Execute by MySQL server with current database connected
     query = """SELECT pony.name, body_part.name, color.name, color.value 
                FROM (((pony_color
                INNER JOIN color     ON pony_color.color_id = color.id    )
                INNER JOIN pony      ON pony_color.pony_id  = pony.id     )
                INNER JOIN body_part ON pony_color.type_id  = body_part.id)
-               WHERE value='%s';""" %color
-
+               WHERE value={}""".format(q)    # Second part of SQL injection protection. Don`t ask me how it works...
     try:
         # Execute the query
         cursor.execute(query)
@@ -67,7 +67,7 @@ def pony_color_determinator():
 db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password="password", database="pony_color_db", charset="utf8")    # charset='utf8' - for correct encoding
 
 # Processing data from 'results' table
-#printer()    # Если вы не знаете какие цвета есть в базе данных - раскоментируйте эту строчку.
+printer()    # Если вы не знаете какие цвета есть в базе данных - раскоментируйте эту строчку.
 pony_color_determinator()
 #input()    # Если после ввода цвета все быстро закрывается - раскомментируйте эту строчку.
 
