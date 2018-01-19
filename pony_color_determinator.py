@@ -194,6 +194,7 @@ def closest_color_determinator(): # Function to find closest color in database. 
         # Now print fetched result
         print ("It`s %s of %s!" %(body_part, name))
 
+
 # Open database connection
 db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password="password",\
                      database="pony_color_db", charset="utf8")    # charset='utf8' - for correct encoding
