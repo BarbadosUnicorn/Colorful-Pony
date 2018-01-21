@@ -1,10 +1,10 @@
-import pymysql, traceback
+import pymysql
 
 def printer():    # Print names, body parts, color id`s and values for each pony in database. Use only while database is connected
     # Prepare a cursor object using cursor() method
     cursor = db.cursor()
     # Prepare SQL query to Execute by MySQL server with current database connected
-    join_query = """SELECT pony.name, body_part.name, color.name, color.id, color.L, color.a, color.b
+    join_query = """SELECT pony.name, body_part.name, color.name, color.id, color.L, color.a, color.b, color.RGB
                         FROM (((pony_color
                         INNER JOIN color     ON pony_color.color_id = color.id    )
                         INNER JOIN pony      ON pony_color.pony_id  = pony.id     )
@@ -19,9 +19,10 @@ def printer():    # Print names, body parts, color id`s and values for each pony
         L           = row[4]
         a           = row[5]
         b           = row[6]
+        RGB         = row[7]
         # Now print fetched result
-        print ("name = %s, body_part = %s, color_id = %s, L = %s, a = %s, b = %s" % \
-                                                            (name, body_part, color_id, L, a, b))
+        print ("name = %s, body_part = %s, color_id = %s, L = %s, a = %s, b = %s, RGB = %s" % \
+                                                            (name, body_part, color_id, L, a, b, RGB))
 
 def pony_color_determinator(): # Used to work with old DB. But now it`s not, since DB don`t contain 'value' column with
                                # RGB value of color. Use only if your know what to do.
@@ -122,43 +123,6 @@ def RGBtoLab(color):    # Converter from RGB to CIE Lab. Reference white used D6
         print('Wrong input')
         raise SystemExit
 
-def migration():    # Since migration completed it`s just an example of migration scrypt.
-                    # Use only while database is connected
-
-    cursor = db.cursor()
-
-    alter_query_L = 'ALTER TABLE color ADD L DOUBLE;'
-    alter_query_a = 'ALTER TABLE color ADD a DOUBLE;'
-    alter_query_b = 'ALTER TABLE color ADD b DOUBLE;'
-    select_query = 'SELECT * FROM color;'
-
-    try:
-        cursor.execute(alter_query_L)
-        cursor.execute(alter_query_a)
-        cursor.execute(alter_query_b)
-        cursor.execute(select_query)
-        results = cursor.fetchall()
-
-        for row in results:
-            id    = row[0]
-            #name  = row[1]
-            value = row[2]
-            #L     = row[3]
-            #a     = row[4]
-            #b     = row[5]
-            Lab_color = RGBtoLab(value)
-            update_query = '''UPDATE color
-                              SET L = %s, a = %s, b = %s
-                              WHERE id = %s;''' % \
-                                                (str(Lab_color['L']), str(Lab_color['a']), str(Lab_color['b']), str(id))
-            cursor.execute(update_query)
-
-        cursor.execute('''ALTER TABLE color
-                          DROP COLUMN value;''')
-
-    except:
-        traceback.print_exc()
-
 def closest_color_determinator(): # Function to find closest color in database. Use only while database is connected
     print('Enter color of pony in HEX format with "#" symbol:')
     color = input()
@@ -167,14 +131,7 @@ def closest_color_determinator(): # Function to find closest color in database. 
     cursor = db.cursor()
     # Prepare SQL query to Execute by MySQL server with current database connected
 
-    '''
-    query = """SELECT MIN((L - {L})*(L - {L})+(a - {a})*(a - {a})+(b - {b})*(b - {b}))
-               FROM color""".format(L = color['L'], a = color['a'], b = color['b'])
-    cursor.execute(query)
-    print('radius =', cursor.fetchall()[0][0]) # This thing is able to find the smallest radius. Only radius
-    '''
-
-    query = """SELECT color.id, color.name, pony.name, body_part.name
+    query = """SELECT color.id, color.name, pony.name, body_part.name, color.RGB
                FROM pony_color
                INNER JOIN color     ON pony_color.color_id = color.id
                INNER JOIN pony      ON pony_color.pony_id  = pony.id
@@ -185,14 +142,18 @@ def closest_color_determinator(): # Function to find closest color in database. 
     cursor.execute(query)
     results = cursor.fetchall()
 
+    response = '[ '
     for row in results:
 
         color_id    = row[0]
         color_name  = row[1]
         name        = row[2]
         body_part   = row[3]
+        color       = row[4]
         # Now print fetched result
-        print ("It`s %s of %s!" %(body_part, name))
+        response = response[:-1] + '{"body_part":"%s","color":"%s","name":"%s","color_name":"%s"},' %(body_part, color, name, color_name)
+    response = response[:-1] + ']'
+    print(response)
 
 
 # Open database connection
@@ -200,6 +161,7 @@ db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password="passwor
                      database="pony_color_db", charset="utf8")    # charset='utf8' - for correct encoding
 
 # Processing data from 'results' table
+#printer()
 closest_color_determinator()
 #input()    # If you run console - uncomment this to see result before it closes. Simply press Enter button to close it
 

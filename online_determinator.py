@@ -1,4 +1,4 @@
-import pymysql, traceback
+import pymysql
 from flask import Flask, request
 app = Flask(__name__)
 
@@ -70,10 +70,10 @@ def closest_color_online_determinator(): # Function to find closest color in dat
     color = request.args.get('color')
     color = RGBtoLab(color)
     db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password="password",\
-                     database="pony_color_db", charset="utf8")
+                                                                   database="pony_color_db", charset="utf8")
     cursor = db.cursor()
 
-    query = """SELECT color.id, color.name, pony.name, body_part.name
+    query = """SELECT color.id, color.name, pony.name, body_part.name, color.RGB
                FROM pony_color
                INNER JOIN color     ON pony_color.color_id = color.id
                INNER JOIN pony      ON pony_color.pony_id  = pony.id
@@ -86,14 +86,15 @@ def closest_color_online_determinator(): # Function to find closest color in dat
 
     db.close()
 
-    response = '['
+    response = '[ '
     for row in results:
 
         #color_id    = row[0]
-        #color_name  = row[1]
+        color_name  = row[1]
         name        = row[2]
         body_part   = row[3]
-        response = response[:-1] + '{"pony":"It`s %s of %s!"},' %(body_part, name)    # Concating objects to response
+        color       = row[4]
+        response = response[:-1] + '{"body_part":"%s","color":"%s","name":"%s","color_name":"%s"},' %(body_part, color, name, color_name)    # Concating objects to response
 
     response = response[:-1] + ']'    # JSON response is an array of objects
 
