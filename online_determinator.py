@@ -1,19 +1,26 @@
 import pymysql
-from flask import Flask, request
+from flask import Flask, jsonify, request
 app = Flask(__name__)
+
+
+def color_retriever(color_input): # Making R, G and B variables from input string
+
+    rgb = str(color_input)
+    R16 = rgb[len(rgb) - 6:len(rgb) - 4]
+    G16 = rgb[len(rgb) - 4:len(rgb) - 2]
+    B16 = rgb[len(rgb) - 2:]
+
+    color = {'R': R16, 'G': G16, 'B': B16}
+
+    return color
+
 
 def RGBtoLab(color):    # Converter from RGB to CIE Lab. Reference white used D65/2° standard illuminant
 
-    try:  # Making R, G and B variables from input string
-        rgb = str(color).rstrip()
-        R16 = rgb[len(rgb) - 6:len(rgb) - 4]
-        G16 = rgb[len(rgb) - 4:len(rgb) - 2]
-        B16 = rgb[len(rgb) - 2:]
-
         # RGB to XYZ
-        r = int(R16, 16) / 255
-        g = int(G16, 16) / 255
-        b = int(B16, 16) / 255
+        r = int(color['R'], 16) / 255
+        g = int(color['G'], 16) / 255
+        b = int(color['B'], 16) / 255
 
         if ( r > 0.04045 ):
             r = ( ( r + 0.055 ) / 1.055 ) ** 2.4
@@ -61,15 +68,27 @@ def RGBtoLab(color):    # Converter from RGB to CIE Lab. Reference white used D6
 
         return {'L': L, 'a': a, 'b': b}
 
-    except:
-        print('Wrong input')
-        raise SystemExit
 
 @app.route('/api/get_pony_by_color')
 def closest_color_online_determinator(): # Function to find closest color in database.
-    color = request.args.get('color')
+
+    color_input = request.args.get('color')
+    color = color_retriever(color_input)
+
+    try:
+        int(str(color_input), 16)
+
+    except:
+
+        message =  {"status":"error","description":"Invalid color code."}
+        resp = jsonify(message)
+        resp.status_code = 403
+        return resp
+        pass
+
     color = RGBtoLab(color)
-    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password="password",\
+
+    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password="00000000",\
                                                                    database="pony_color_db", charset="utf8")
     cursor = db.cursor()
 
@@ -79,7 +98,8 @@ def closest_color_online_determinator(): # Function to find closest color in dat
                INNER JOIN pony      ON pony_color.pony_id  = pony.id
                INNER JOIN body_part ON pony_color.type_id  = body_part.id
                GROUP BY color.id, pony.id, body_part.id
-               ORDER BY MIN((L - {L})*(L - {L})+(a - {a})*(a - {a})+(b - {b})*(b - {b})) LIMIT 1""".format(L = color['L'], a = color['a'], b = color['b'])
+               ORDER BY MIN((L - {L})*(L - {L})+(a - {a})*(a - {a})+(b - {b})*(b - {b})) LIMIT 1""".format(L = color['L'],\
+                                                                                           a = color['a'], b = color['b'])
 
     cursor.execute(query)
     results = cursor.fetchall()
@@ -87,6 +107,7 @@ def closest_color_online_determinator(): # Function to find closest color in dat
     db.close()
 
     response = '[ '
+
     for row in results:
 
         #color_id    = row[0]
@@ -94,10 +115,25 @@ def closest_color_online_determinator(): # Function to find closest color in dat
         name        = row[2]
         body_part   = row[3]
         color       = row[4]
-        response = response[:-1] + '{"body_part":"%s","color":"%s","name":"%s","color_name":"%s"},' %(body_part, color, name, color_name)    # Concating objects to response
+        response = response[:-1] + '{"body_part":"%s","color":"%s","name":"%s","color_name":"%s"},' %(body_part,\
+                                                                                        color, name, color_name)    # Concating objects to response
 
     response = response[:-1] + ']'    # JSON response is an array of objects
 
     return response
 
 # Adress of fun: http://localhost:5000/api/get_pony_by_color?color=053550
+
+
+'''
+ if int(color_input, 16):
+        color = color_retriever(color_input)
+        color = RGBtoLab(color)
+    
+    else:
+         message =  {"status":"error","description":"Invalid color code."}
+        resp = jsonify(message)
+        resp.status_code = 403
+        return resp
+        pass
+'''
