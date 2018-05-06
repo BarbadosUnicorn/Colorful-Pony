@@ -3,7 +3,9 @@ from flask import Flask, jsonify, request
 app = Flask(__name__)
 
 
-def color_retriever(color_input): # Making R, G and B variables from input string
+def color_retriever(color_input):   # Making R, G and B variables from input string
+
+    int(str(color_input), 16)    # Test for catching exeptions on "wrong" colors
 
     rgb = str(color_input)
     R16 = rgb[len(rgb) - 6:len(rgb) - 4]
@@ -73,10 +75,9 @@ def RGBtoLab(color):    # Converter from RGB to CIE Lab. Reference white used D6
 def closest_color_online_determinator(): # Function to find closest color in database.
 
     color_input = request.args.get('color')
-    color = color_retriever(color_input)
 
     try:
-        int(str(color_input), 16)
+        color = color_retriever(color_input)    # Try-except block for better input color processing
 
     except:
 
@@ -123,17 +124,3 @@ def closest_color_online_determinator(): # Function to find closest color in dat
     return response
 
 # Adress of fun: http://localhost:5000/api/get_pony_by_color?color=053550
-
-
-'''
- if int(color_input, 16):
-        color = color_retriever(color_input)
-        color = RGBtoLab(color)
-    
-    else:
-         message =  {"status":"error","description":"Invalid color code."}
-        resp = jsonify(message)
-        resp.status_code = 403
-        return resp
-        pass
-'''
