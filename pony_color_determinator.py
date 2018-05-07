@@ -63,6 +63,7 @@ def pony_color_determinator(): # Used to work with old DB. But now it`s not, sin
 def RGBtoLab(color):    # Converter from RGB to CIE Lab. Reference white used D65/2° standard illuminant
 
     try:  # Making R, G and B variables from input string
+
         rgb = str(color).rstrip()
         R16 = rgb[len(rgb) - 6:len(rgb) - 4]
         G16 = rgb[len(rgb) - 4:len(rgb) - 2]
@@ -167,3 +168,4 @@ closest_color_determinator()
 
 # Disconnect from server
 db.close()
+

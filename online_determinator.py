@@ -3,11 +3,14 @@ from flask import Flask, jsonify, request
 app = Flask(__name__)
 
 
-def color_retriever(color_input):   # Making R, G and B variables from input string
+def color_retriever(color_input):    # Making R, G and B variables from input string
 
-    int(str(color_input), 16)    # Test for catching exeptions on "wrong" colors
+    int(str(color_input), 16)        # Test for catching exeptions on "wrong" colors
 
     rgb = str(color_input)
+
+    if len(rgb) != 6: int('', 16)    # Another test for catching exeptions on "wrong" colors
+
     R16 = rgb[len(rgb) - 6:len(rgb) - 4]
     G16 = rgb[len(rgb) - 4:len(rgb) - 2]
     B16 = rgb[len(rgb) - 2:]
