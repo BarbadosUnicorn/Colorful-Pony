@@ -5,11 +5,10 @@ app = Flask(__name__)
 
 def color_retriever(color_input):    # Making R, G and B variables from input string
 
-    int(str(color_input), 16)        # Test for catching exeptions on "wrong" colors
-
     rgb = str(color_input)
 
-    if len(rgb) != 6: int('', 16)    # Another test for catching exeptions on "wrong" colors
+    if len(rgb) != 6: int('', 16)    # Test for catching exceptions on "non-6-digit" colors
+    int(rgb, 16)                     # Another test for catching exceptions on "non-HEX" colors
 
     R16 = rgb[len(rgb) - 6:len(rgb) - 4]
     G16 = rgb[len(rgb) - 4:len(rgb) - 2]
