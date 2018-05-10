@@ -92,7 +92,7 @@ def closest_color_online_determinator(): # Function to find closest color in dat
 
     color = RGBtoLab(color)
 
-    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password="00000000",\
+    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password="password",\
                                                                    database="pony_color_db", charset="utf8")
     cursor = db.cursor()
 
