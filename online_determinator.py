@@ -1,5 +1,7 @@
-import pymysql
+import pymysql, configparser, os, bcrypt
 from flask import Flask, jsonify, request
+
+path = "settings.ini"
 app = Flask(__name__)
 
 
@@ -73,8 +75,80 @@ def RGBtoLab(color):    # Converter from RGB to CIE Lab. Reference white used D6
         return {'L': L, 'a': a, 'b': b}
 
 
-@app.route('/api/get_pony_by_color')
-def closest_color_online_determinator(): # Function to find closest color in database.
+def create_config(path): # Create a config file
+    config = configparser.ConfigParser()
+    config.add_section("Settings")
+    config.set("Settings", "DB_password", "DB_password_value")
+    config.set("Settings", "mail_password", "mail_password_value")
+
+    with open(path, "w") as config_file:
+        config.write(config_file)
+
+
+def get_config(path):  # Returns the config object
+    if not os.path.exists(path):
+        create_config(path)
+
+    config = configparser.ConfigParser()
+    config.read(path)
+    return config
+
+
+def get_setting(path, section, setting):  # Get a setting
+    config = get_config(path)
+    value = config.get(section, setting)
+    return value
+
+
+def send_email(message_text, senders_address, mail_password, recipient_address):
+    import smtplib
+    from email.mime.text import MIMEText
+
+    me = senders_address
+    you = recipient_address
+    smtp_server = 'smtp.gmail.com'
+    msg = MIMEText(message_text)
+    msg['Subject'] = 'E-mail verification '
+    msg['From'] = me
+    msg['To'] = you
+    s = smtplib.SMTP(smtp_server)
+    s.starttls()
+    s.login(senders_address, mail_password)
+    s.sendmail(me, [you], msg.as_string())
+    s.quit()
+
+
+def random_string_generator(length):    # Making string of [A-Z, a-z, 0-9] with desired length. Len >= 0
+    import string, random
+
+    token = ""
+    for x in range(length):
+        token += random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits)
+
+    return token
+
+
+def test_email(email):
+    import re
+    pattern = re.compile(r"\"?([-a-zA-Z0-9.`?{}]+@\w+\.\w+)\"?")
+    if re.match(pattern, email):
+        return 1==1
+    else:
+        return 1==0
+
+
+def simple_response(status_code, status, description):
+    message = {"status":status,"description":description}
+    resp = jsonify(message)
+    resp.status_code = status_code
+    return resp
+
+
+DB_password = get_setting(path, 'Settings', 'DB_password')
+
+
+@app.route('/api/get_pony_by_color')  # Function to find closest color in database.
+def closest_color_online_determinator():
 
     color_input = request.args.get('color')
 
@@ -82,16 +156,12 @@ def closest_color_online_determinator(): # Function to find closest color in dat
         color = color_retriever(color_input)    # Try-except block for better input color processing
 
     except:
-
-        message =  {"status":"error","description":"Invalid color code."}
-        resp = jsonify(message)
-        resp.status_code = 403
-        return resp
+        return simple_response(403, "error", "Invalid color code.")
         pass
 
     color = RGBtoLab(color)
 
-    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password="password",\
+    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
                                                                    database="pony_color_db", charset="utf8")
     cursor = db.cursor()
 
@@ -124,5 +194,158 @@ def closest_color_online_determinator(): # Function to find closest color in dat
     response = response[:-1] + ']'    # JSON response is an array of objects
 
     return response
+
+
+@app.route('/api/signup')   # Creates non-activated user in DB and sends activation code via link. Code also writes in DB. E-mail is username.
+def user_creator():
+
+    user_mail = request.args.get('mail')
+    user_password = request.args.get('password')
+
+    if len(str(user_password)) < 8:  # If it's shorter then 8 symbols - rise error!
+        return simple_response(403, "error", "Password must be at least 8 symbols long.")
+        pass
+
+    if not test_email(user_mail):    # Check if email match RFC 6531 standards.
+        return simple_response(403, "error", "Email doesn't match RFC 6531 standards.")
+        pass
+
+    project_mail = get_setting(path, 'Settings', 'project_mail')
+    project_mail_password = get_setting(path, 'Settings', 'mail_password')
+    project_salt = get_setting(path, 'Settings', 'salt')
+    URL = get_setting(path, 'Settings', 'URL')
+
+    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
+                                                                   database="pony_color_db", charset="utf8")
+    cursor = db.cursor()
+    user_mail = db.escape(user_mail)
+    user_password = db.escape(user_password)
+
+    query = """SELECT active, verification_code FROM users WHERE email="{MAIL}" """.format(MAIL = user_mail)    # Check if it's already in DB
+
+    cursor.execute(query)
+    results = cursor.fetchall()
+
+    if results is (): # Here we come if there is no such e-mail in DB. It's user-creation time!
+
+        salt_one = random_string_generator(32)
+        project_salt = project_salt
+        to_hash = project_salt + user_password + salt_one             ######## THIS IS HOW PASSWORDS ########
+        hashed = bcrypt.hashpw(to_hash.encode(), bcrypt.gensalt())    ########    MUST BE HASHED     ########
+        activation_key =  random_string_generator(72)
+        active = 0
+
+        query = """INSERT INTO users (email, hash, salt_one, activation_key, active)
+                   VALUES ("{MAIL}", "{HASH}", "{SALT_ONE}", "{ACTIVATION_KEY}", "{ACTIVE}") """.format(\
+                                                    MAIL = user_mail, HASH = hashed, SALT_ONE = salt_one, \
+                                                    ACTIVATION_KEY = activation_key, ACTIVE = active)
+        cursor.execute(query)
+        verification_URL = URL + '/api/verify?code=' + activation_key
+        send_email(verification_URL, project_mail, project_mail_password, user_mail) # Sending link to verify e-mail
+        db.close()
+        return simple_response(200, "success", "Account created. Activation link sent to your email.")
+
+    elif results[0] == 1:    # If e-mail already already activated - 403 [e-mail is used]
+        db.close()
+        return simple_response(403, "error", "E-mail is used")
+
+    else:    # Send new activation code
+        activation_key =  random_string_generator(72)
+
+        query = """UPDATE users
+                   SET activation_key="{ACTIVATION_KEY}"
+                   WHERE email="{MAIL}" """.format(ACTIVATION_KEY = activation_key, MAIL = user_mail)
+
+        cursor.execute(query)    # Changing activation key
+        db.close()
+
+        verification_URL = URL + '/api/verify?code=' + activation_key
+
+        send_email(verification_URL, project_mail, project_mail_password, user_mail) # Sending link to verify e-mail
+
+        return simple_response(403, "error", "E-mail is not activated. Check your mailbox for new activation code. It may be in spam folder.")
+
+
+@app.route('/api/verify')    # Get verification code, activate user if E-mail and code match DB record.
+def verification():
+
+    verification_code = request.args.get('code')
+
+    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
+                                                                   database="pony_color_db", charset="utf8")
+    cursor = db.cursor()
+    verification_code = db.escape(verification_code)
+
+    query = """SELECT id FROM users WHERE verification_code="{CODE}" """.format(CODE = verification_code)
+
+    cursor.execute(query)
+    results = cursor.fetchall()
+
+    if results is ():
+        db.close()
+        return simple_response(403, "error", "Invalid verification code.")
+
+    else:
+        query = """UPDATE users 
+                   SET active = 1, verification_code = 0
+                   WHERE verification_code="{CODE}" """.format(CODE = verification_code)     # Here the table should be modified.
+        cursor.execute(query)
+        db.close()
+        return simple_response(200, "success", "Verification complete")
+
+
+@app.route('/api/resend')    # Sends new verification code and changes it in DB. For non-existing users ni DB say that they are not in DB.
+def resend_verification_code():
+
+    user_mail = request.args.get('mail')
+
+    project_mail = get_setting(path, 'Settings', 'project_mail')
+    project_mail_password = get_setting(path, 'Settings', 'mail_password')
+    URL = get_setting(path, 'Settings', 'URL')
+
+    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
+                                                                   database="pony_color_db", charset="utf8")
+    cursor = db.cursor()
+    user_mail = db.escape(user_mail)
+
+    query = """SELECT active FROM users WHERE email="{MAIL}" """.format(MAIL = user_mail)    # Check if it's already in DB
+
+    cursor.execute(query)
+    results = cursor.fetchall()
+
+    if results is ():  # Here we come if there is no such e-mail in DB. It's user-creation time!
+        db.close()
+        return simple_response(403, "error", "No such user in database")
+
+    elif results[0] == 1:  # If e-mail already already activated - 403 [e-mail is used]
+        db.close()
+        return simple_response(403, "error", "This account is already activated")
+
+    else:    # Send new activation code
+        activation_key =  random_string_generator(72)
+
+        query = """UPDATE users
+                   SET activation_key="{ACTIVATION_KEY}"
+                   WHERE email="{MAIL}" """.format(ACTIVATION_KEY = activation_key, MAIL = user_mail)
+
+        cursor.execute(query)    # Changing activation key
+        db.close()
+
+        verification_URL = URL + '/api/verify?code=' + activation_key
+
+        send_email(verification_URL, project_mail, project_mail_password, user_mail) # Sending link to verify e-mail
+
+        return simple_response(403, "error", "E-mail is not activated. Check your mailbox for new activation code. It may be in spam folder.")
+
+
+@app.route('/api/signin')
+def sign_in():
+    return response
+
+
+@app.route('/api/signout')
+def sign_out():
+    return response
+
 
 # Adress of fun: http://localhost:5000/api/get_pony_by_color?color=053550

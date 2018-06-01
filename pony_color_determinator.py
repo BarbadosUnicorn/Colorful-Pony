@@ -31,7 +31,7 @@ def pony_color_determinator(): # Used to work with old DB. But now it`s not, sin
     color = input()    # Вводим цвет
     # Prepare a cursor object using cursor() method
     cursor = db.cursor()
-    q = db.escape(color)    # SQL injection protection by shielding. Jusn like this '\' thing
+    q = db.escape(color)    # SQL injection protection by shielding. Just like this '\' thing
     # Prepare SQL query to Execute by MySQL server with current database connected
     query = """SELECT pony.name, body_part.name, color.name, color.value 
                FROM (((pony_color
