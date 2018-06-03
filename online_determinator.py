@@ -80,6 +80,9 @@ def create_config(path): # Create a config file
     config.add_section("Settings")
     config.set("Settings", "DB_password", "DB_password_value")
     config.set("Settings", "mail_password", "mail_password_value")
+    config.set("Settings", "project_mail", "project.mail@example.com")
+    config.set("Settings", "salt", "00000000000000000000000000000000")
+    config.set("Settings", "URL", "project_URL")
 
     with open(path, "w") as config_file:
         config.write(config_file)
@@ -142,6 +145,14 @@ def simple_response(status_code, status, description):
     resp = jsonify(message)
     resp.status_code = status_code
     return resp
+
+
+def expires(days):
+    import time
+    lease = days * 24 * 60 * 60  # days in seconds
+    end = time.gmtime(time.time() + lease)
+    expires = time.strftime("%a, %d-%b-%Y %T GMT", end)
+    return expires
 
 
 DB_password = get_setting(path, 'Settings', 'DB_password')
@@ -226,8 +237,7 @@ def user_creator():
     cursor.execute(query)
     results = cursor.fetchall()
 
-    if results is (): # Here we come if there is no such e-mail in DB. It's user-creation time!
-
+    if results is ():  # Here we come if there is no such e-mail in DB. It's user-creation time!
         salt_one = random_string_generator(32)
         project_salt = project_salt
         to_hash = project_salt + user_password + salt_one             ######## THIS IS HOW PASSWORDS ########
@@ -245,7 +255,7 @@ def user_creator():
         db.close()
         return simple_response(200, "success", "Account created. Activation link sent to your email.")
 
-    elif results[0] == 1:    # If e-mail already already activated - 403 [e-mail is used]
+    elif results[0] == 1:    # If e-mail already activated - 403 [e-mail is used]
         db.close()
         return simple_response(403, "error", "E-mail is used")
 
@@ -335,17 +345,74 @@ def resend_verification_code():
 
         send_email(verification_URL, project_mail, project_mail_password, user_mail) # Sending link to verify e-mail
 
-        return simple_response(403, "error", "E-mail is not activated. Check your mailbox for new activation code. It may be in spam folder.")
+        return simple_response(200, "success", "Check your mailbox for new activation code. It may be in spam folder.")
 
 
 @app.route('/api/signin')
 def sign_in():
-    return response
 
+    user_mail = request.args.get('mail')
+    user_password = request.args.get('password')
+    project_salt = get_setting(path, 'Settings', 'salt')
+
+    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
+                                                                   database="pony_color_db", charset="utf8")
+    cursor = db.cursor()
+    user_mail = db.escape(user_mail)
+    user_password = db.escape(user_password)
+
+    query = """SELECT active, hash, salt_one FROM users WHERE email="{MAIL}" """.format(MAIL = user_mail)    # Find user, hash and salt in DB
+
+    cursor.execute(query)
+    results = cursor.fetchall()
+
+    if results is ():  # Here we come if there is no such e-mail in DB.
+        db.close()
+        return simple_response(403, "error", "No such user in database")
+
+    elif results[0] == 0: # If account not activated
+        db.close()
+        return simple_response(403, "error", "E-mail is not activated")
+
+    else:  # If account activated - check password
+        hash = results[1]
+        salt_one = results[2]
+        password = project_salt + user_password + salt_one             ######## THIS IS HOW PASSWORDS ########
+        if bcrypt.checkpw(password.encode(), hash):                    ########    MUST BE CHECKED    ########
+            # If it match
+            value = random_string_generator(45)
+            expire_date = expires(1)
+
+            query = """INSERT INTO sessions (key, datetime)
+                       VALUES ("{KEY}", "{DATETIME}") """.format(\
+                                                    KEY = value, DATETIME = expire_date)
+            cursor.execute(query)
+            db.close()
+
+            URL = get_setting(path, 'Settings', 'URL')
+            my_cookie = {'domain':URL,
+                         'expires':expire_date,
+                         'name':'pony_color_determinator',
+                         'path':'/',
+                         'value':value,
+                         'version':0}
+
+            return simple_response(200, "success", "Signed in successfully").set_cookie(my_cookie)
+
+        else:    # If password doesn't match
+            db.close()
+            return simple_response(403, "error", "Wrong password")
 
 @app.route('/api/signout')
 def sign_out():
-    return response
-
+    cookies = request.cookies
+    if 'value' in cookies:
+        db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
+                                                                   database="pony_color_db", charset="utf8")
+        cursor = db.cursor()
+        query = """DELETE FROM users WHERE key="{KEY}" """.format(KEY = cookies['value'])    # Find user, hash and salt in DB
+        cursor.execute(query)
+        db.close()
+        return simple_response(200, "success", "Signed out successfully")
 
 # Adress of fun: http://localhost:5000/api/get_pony_by_color?color=053550
