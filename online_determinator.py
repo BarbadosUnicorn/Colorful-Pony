@@ -162,49 +162,64 @@ DB_password = get_setting(path, 'Settings', 'DB_password')
 def closest_color_online_determinator():
 
     color_input = request.args.get('color')
+    cookies = request.cookies
 
-    try:
-        color = color_retriever(color_input)    # Try-except block for better input color processing
+    if not('value' in cookies):
+        return simple_response(403, "error", "Not authorised")
 
-    except:
-        return simple_response(403, "error", "Invalid color code.")
-        pass
-
-    color = RGBtoLab(color)
-
-    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
+    if 'value' in cookies:
+        db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
                                                                    database="pony_color_db", charset="utf8")
-    cursor = db.cursor()
+        cursor = db.cursor()
+        query = """SELECT id FROM sessions WHERE key="{KEY}" """.format(KEY = cookies['value'])    # Find user, hash and salt in DB
+        cursor.execute(query)
 
-    query = """SELECT color.id, color.name, pony.name, body_part.name, color.RGB
-               FROM pony_color
-               INNER JOIN color     ON pony_color.color_id = color.id
-               INNER JOIN pony      ON pony_color.pony_id  = pony.id
-               INNER JOIN body_part ON pony_color.type_id  = body_part.id
-               GROUP BY color.id, pony.id, body_part.id
-               ORDER BY MIN((L - {L})*(L - {L})+(a - {a})*(a - {a})+(b - {b})*(b - {b})) LIMIT 1""".format(L = color['L'],\
-                                                                                           a = color['a'], b = color['b'])
+        results = cursor.fetchall()
 
-    cursor.execute(query)
-    results = cursor.fetchall()
+        if results is ():  # Here we come if user not logged in.
+            db.close()
+            return simple_response(403, "error", "Not authorised")
 
-    db.close()
+        else:    # Here we come if everything OK.
 
-    response = '[ '
+            try:
+                color = color_retriever(color_input)    # Try-except block for better input color processing
 
-    for row in results:
+            except:
+                db.close()
+                return simple_response(403, "error", "Invalid color code.")
 
-        #color_id    = row[0]
-        color_name  = row[1]
-        name        = row[2]
-        body_part   = row[3]
-        color       = row[4]
-        response = response[:-1] + '{"body_part":"%s","color":"%s","name":"%s","color_name":"%s"},' %(body_part,\
+            color = RGBtoLab(color)
+
+            query = """SELECT color.id, color.name, pony.name, body_part.name, color.RGB
+                      FROM pony_color
+                      INNER JOIN color     ON pony_color.color_id = color.id
+                      INNER JOIN pony      ON pony_color.pony_id  = pony.id
+                      INNER JOIN body_part ON pony_color.type_id  = body_part.id
+                      GROUP BY color.id, pony.id, body_part.id
+                      ORDER BY MIN((L - {L})*(L - {L})+(a - {a})*(a - {a})+(b - {b})*(b - {b})) LIMIT 1""".format(L = color['L'],\
+                                                                                                  a = color['a'], b = color['b'])
+
+            cursor.execute(query)
+            results = cursor.fetchall()
+
+            db.close()
+
+            response = '[ '
+
+            for row in results:
+
+                    #color_id    = row[0]
+                    color_name  = row[1]
+                    name        = row[2]
+                    body_part   = row[3]
+                    color       = row[4]
+                    response = response[:-1] + '{"body_part":"%s","color":"%s","name":"%s","color_name":"%s"},' %(body_part,\
                                                                                         color, name, color_name)    # Concating objects to response
 
-    response = response[:-1] + ']'    # JSON response is an array of objects
+                    response = response[:-1] + ']'    # JSON response is an array of objects
 
-    return response
+            return response
 
 
 @app.route('/api/signup')   # Creates non-activated user in DB and sends activation code via link. Code also writes in DB. E-mail is username.
@@ -410,7 +425,7 @@ def sign_out():
         db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
                                                                    database="pony_color_db", charset="utf8")
         cursor = db.cursor()
-        query = """DELETE FROM users WHERE key="{KEY}" """.format(KEY = cookies['value'])    # Find user, hash and salt in DB
+        query = """DELETE FROM sessions WHERE key="{KEY}" """.format(KEY = cookies['value'])    # Find user, hash and salt in DB
         cursor.execute(query)
         db.close()
         return simple_response(200, "success", "Signed out successfully")
