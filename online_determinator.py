@@ -257,15 +257,16 @@ def user_creator():
         project_salt = project_salt
         to_hash = project_salt + user_password + salt_one             ######## THIS IS HOW PASSWORDS ########
         hashed = bcrypt.hashpw(to_hash.encode(), bcrypt.gensalt())    ########    MUST BE HASHED     ########
-        activation_key =  random_string_generator(72)
+        hash = hashed.decode()
+        verification_code =  random_string_generator(72)
         active = 0
 
-        query = """INSERT INTO users (email, hash, salt_one, activation_key, active)
-                   VALUES ("{MAIL}", "{HASH}", "{SALT_ONE}", "{ACTIVATION_KEY}", "{ACTIVE}") """.format(\
-                                                    MAIL = user_mail, HASH = hashed, SALT_ONE = salt_one, \
-                                                    ACTIVATION_KEY = activation_key, ACTIVE = active)
+        query = """INSERT INTO users (email, hash, salt_one, verification_code, active)
+                   VALUES ("{MAIL}", "{HASH}", "{SALT_ONE}", "{VERIFICATION_CODE}", "{ACTIVE}") """.format(\
+                                                    MAIL = user_mail, HASH = hash, SALT_ONE = salt_one, \
+                                                    VERIFICATION_CODE = verification_code, ACTIVE = active)
         cursor.execute(query)
-        verification_URL = URL + '/api/verify?code=' + activation_key
+        verification_URL = URL + '/api/verify?code=' + verification_code
         send_email(verification_URL, project_mail, project_mail_password, user_mail) # Sending link to verify e-mail
         db.close()
         return simple_response(200, "success", "Account created. Activation link sent to your email.")
@@ -338,7 +339,7 @@ def resend_verification_code():
     cursor.execute(query)
     results = cursor.fetchall()
 
-    if results is ():  # Here we come if there is no such e-mail in DB. It's user-creation time!
+    if results is ():  # Here we come if there is no such e-mail in DB.
         db.close()
         return simple_response(403, "error", "No such user in database")
 
@@ -391,6 +392,7 @@ def sign_in():
 
     else:  # If account activated - check password
         hash = results[1]
+        hash = hash.encode()
         salt_one = results[2]
         password = project_salt + user_password + salt_one             ######## THIS IS HOW PASSWORDS ########
         if bcrypt.checkpw(password.encode(), hash):                    ########    MUST BE CHECKED    ########

@@ -98,12 +98,13 @@ def send_email(message_text, senders_adress, mail_password, recipient_adress):
     s.quit()
 
 
-#path = "settings.ini"
+path = "settings.ini"
 
-#mail_password = get_setting(path, 'Settings', 'mail_password')
-#project_mail_adress = get_setting(path, 'Settings', 'project_mail')
+mail_password = get_setting(path, 'Settings', 'mail_password')
+project_mail_adress = get_setting(path, 'Settings', 'project_mail')
+recipient = 'xtraand0ne@gmail.com'
 
-#send_email('Hello, G-mail!', project_mail_adress, mail_password,'xtraand0ne@gmail.com')
+send_email('Hello, G-mail!', project_mail_adress, mail_password, recipient)
 
 '''
 db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password="00000000",\
