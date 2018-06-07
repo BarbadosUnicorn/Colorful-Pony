@@ -1,13 +1,12 @@
-import pymysql, configparser, os, bcrypt
+import atexit, bcrypt, configparser, os, pymysql, random, re, smtplib, string, time
 from flask import Flask, jsonify, request
-from flask_mail import Mail, Message
+from email.mime.text import MIMEText
 
 path = "settings.ini"
 app = Flask(__name__)
 
 
 def color_retriever(color_input):    # Making R, G and B variables from input string
-
     rgb = str(color_input)
 
     if len(rgb) != 6: int('', 16)    # Test for catching exceptions on "non-6-digit" colors
@@ -18,12 +17,10 @@ def color_retriever(color_input):    # Making R, G and B variables from input st
     B16 = rgb[len(rgb) - 2:]
 
     color = {'R': R16, 'G': G16, 'B': B16}
-
     return color
 
 
 def RGBtoLab(color):    # Converter from RGB to CIE Lab. Reference white used D65/2° standard illuminant
-
         # RGB to XYZ
         r = int(color['R'], 16) / 255
         g = int(color['G'], 16) / 255
@@ -72,7 +69,6 @@ def RGBtoLab(color):    # Converter from RGB to CIE Lab. Reference white used D6
         a = 500 * ( X - Y )
         b = 200 * ( Y - Z )
         # Any of L, a and b can be '+' or '-'
-
         return {'L': L, 'a': a, 'b': b}
 
 
@@ -105,9 +101,6 @@ def get_setting(path, section, setting):  # Get a setting
 
 
 def send_email(message_text, senders_address, mail_password, recipient_address):
-    import smtplib
-    from email.mime.text import MIMEText
-
     me = senders_address
     you = recipient_address
     smtp_server = 'smtp.gmail.com'
@@ -123,22 +116,18 @@ def send_email(message_text, senders_address, mail_password, recipient_address):
 
 
 def random_string_generator(length):    # Making string of [A-Z, a-z, 0-9] with desired length. Len >= 0
-    import string, random
-
     token = ""
     for x in range(length):
         token += random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits)
-
     return token
 
 
 def test_email(email):
-    import re
     pattern = re.compile(r"\"?([-a-zA-Z0-9.`?{}]+@\w+\.\w+)\"?")
     if re.match(pattern, email):
-        return 1==1
+        return True
     else:
-        return 1==0
+        return False
 
 
 def simple_response(status_code, status, description):
@@ -149,14 +138,21 @@ def simple_response(status_code, status, description):
 
 
 def expires(days):
-    import time
     lease = days * 24 * 60 * 60  # days in seconds
     end = time.gmtime(time.time() + lease)
     expires = time.strftime("%a, %d-%b-%Y %T GMT", end)
     return expires
 
 
+project_mail = get_setting(path, 'Settings', 'project_mail')
+project_mail_password = get_setting(path, 'Settings', 'mail_password')
+project_salt = get_setting(path, 'Settings', 'salt')
+URL = get_setting(path, 'Settings', 'URL')
 DB_password = get_setting(path, 'Settings', 'DB_password')
+
+db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
+                                       database="pony_color_db", charset="utf8") # Connecting to DB when app started
+cursor = db.cursor()
 
 
 @app.route('/api/get_pony_by_color')  # Function to find closest color in database.
@@ -165,30 +161,25 @@ def closest_color_online_determinator():
     color_input = request.args.get('color')
     cookies = request.cookies
 
-    if not('value' in cookies):
+    if 'pony_color_determinator' not in cookies:
         return simple_response(403, "error", "Not authorised")
 
-    if 'value' in cookies:
-        db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
-                                                                   database="pony_color_db", charset="utf8")
-        cursor = db.cursor()
-        escaped_value = cookies['value']
-        query = """SELECT id FROM sessions WHERE key="{KEY}" """.format(KEY = escaped_value)    # Find user, hash and salt in DB
-        cursor.execute(query)
+    else:
+        escaped_value = db.escape(cookies['pony_color_determinator'])
 
+        query = """SELECT id FROM sessions WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find user, hash and salt in DB
+
+        cursor.execute(query)
         results = cursor.fetchall()
 
-        if results is ():  # Here we come if user not logged in.
-            db.close()
+        if not results:  # Here we come if user not logged in.
             return simple_response(403, "error", "Not authorised")
 
         else:    # Here we come if everything OK.
-
             try:
                 color = color_retriever(color_input)    # Try-except block for better input color processing
 
             except:
-                db.close()
                 return simple_response(403, "error", "Invalid color code.")
 
             color = RGBtoLab(color)
@@ -205,10 +196,7 @@ def closest_color_online_determinator():
             cursor.execute(query)
             results = cursor.fetchall()
 
-            db.close()
-
             response = '[ '
-
             for row in results:
 
                     #color_id    = row[0]
@@ -218,7 +206,6 @@ def closest_color_online_determinator():
                     color       = row[4]
                     response = response[:-1] + '{"body_part":"%s","color":"%s","name":"%s","color_name":"%s"},' %(body_part,\
                                                                                         color, name, color_name)    # Concating objects to response
-
                     response = response[:-1] + ']'    # JSON response is an array of objects
 
             return response
@@ -229,35 +216,22 @@ def user_creator():
 
     user_mail = request.args.get('mail')
     user_password = request.args.get('password')
+    escaped_user_mail = db.escape(user_mail)
+    user_password = db.escape(user_password)
 
     if len(str(user_password)) < 8:  # If it's shorter then 8 symbols - rise error!
         return simple_response(403, "error", "Password must be at least 8 symbols long.")
-        pass
 
     if not test_email(user_mail):    # Check if email match RFC 6531 standards.
         return simple_response(403, "error", "Email doesn't match RFC 6531 standards.")
-        pass
-
-    project_mail = get_setting(path, 'Settings', 'project_mail')
-    project_mail_password = get_setting(path, 'Settings', 'mail_password')
-    project_salt = get_setting(path, 'Settings', 'salt')
-    URL = get_setting(path, 'Settings', 'URL')
-
-    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
-                                                                   database="pony_color_db", charset="utf8")
-    cursor = db.cursor()
-    escaped_user_mail = db.escape(user_mail)
-    user_password = db.escape(user_password)
 
     query = """SELECT active, verification_code FROM users WHERE email="{MAIL}" """.format(MAIL = escaped_user_mail)    # Check if it's already in DB
 
     cursor.execute(query)
     results = cursor.fetchall()
-    print(results)
 
-    if results is ():  # Here we come if there is no such e-mail in DB. It's user-creation time!
+    if not results:  # Here we come if there is no such e-mail in DB. It's user-creation time!
         salt_one = random_string_generator(32)
-        project_salt = project_salt
         to_hash = project_salt + user_password + salt_one             ######## THIS IS HOW PASSWORDS ########
         hashed = bcrypt.hashpw(to_hash.encode(), bcrypt.gensalt())    ########    MUST BE HASHED     ########
         hash = hashed.decode()
@@ -272,13 +246,13 @@ def user_creator():
 
         cursor.execute(query)
         db.commit()    # Always commit changes!
+
         verification_URL = URL + '/api/verify?code=' + verification_code
         send_email(verification_URL, project_mail, project_mail_password, user_mail) # Sending link to verify e-mail
-        db.close()
+
         return simple_response(200, "success", "Account created. Activation link sent to your email.")
 
-    elif results[0] == 1:    # If e-mail already activated - 403 [e-mail is used]
-        db.close()
+    elif results[0][0] == 1:    # If e-mail already activated - 403 [e-mail is used]
         return simple_response(403, "error", "E-mail is used")
 
     else:    # Send new activation code
@@ -291,11 +265,9 @@ def user_creator():
 
         cursor.execute(query)   # Changing activation key
         db.commit()    # Always commit changes!
-        db.close()
 
         verification_URL = URL + '/api/verify?code=' + verification_code
-
-        send_email(verification_URL, project_mail, project_mail_password, user_mail) # Sending link to verify e-mail
+        send_email(verification_URL, project_mail, project_mail_password, user_mail)  # Sending link to verify e-mail
 
         return simple_response(403, "error", "E-mail is not activated. Check your mailbox for new activation code. It may be in spam folder.")
 
@@ -304,10 +276,6 @@ def user_creator():
 def verification():
 
     verification_code = request.args.get('code')
-
-    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
-                                                                   database="pony_color_db", charset="utf8")
-    cursor = db.cursor()
     verification_code = db.escape(verification_code)
 
     query = """SELECT id FROM users WHERE verification_code="{CODE}" """.format(CODE = verification_code)
@@ -315,8 +283,7 @@ def verification():
     cursor.execute(query)
     results = cursor.fetchall()
 
-    if results is ():
-        db.close()
+    if not results:
         return simple_response(403, "error", "Invalid verification code.")
 
     else:
@@ -325,7 +292,6 @@ def verification():
                    WHERE verification_code="{CODE}" """.format(CODE = verification_code)     # Here the table should be modified.
         cursor.execute(query)
         db.commit()
-        db.close()
         return simple_response(200, "success", "Verification complete")
 
 
@@ -333,43 +299,30 @@ def verification():
 def resend_verification_code():
 
     user_mail = request.args.get('mail')
+    escaped_user_mail = db.escape(user_mail)
 
-    project_mail = get_setting(path, 'Settings', 'project_mail')
-    project_mail_password = get_setting(path, 'Settings', 'mail_password')
-    URL = get_setting(path, 'Settings', 'URL')
-
-    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
-                                                                   database="pony_color_db", charset="utf8")
-    cursor = db.cursor()
-    escacped_user_mail = db.escape(user_mail)
-
-    query = """SELECT active FROM users WHERE email="{MAIL}" """.format(MAIL = escacped_user_mail)    # Check if it's already in DB
+    query = """SELECT active FROM users WHERE email="{MAIL}" """.format(MAIL = escaped_user_mail)    # Check if it's already in DB
 
     cursor.execute(query)
     results = cursor.fetchall()
 
-    if results is ():  # Here we come if there is no such e-mail in DB.
-        db.close()
+    if not results:  # Here we come if there is no such e-mail in DB.  if results is ():
         return simple_response(403, "error", "No such user in database")
 
-    elif results[0] == 1:  # If e-mail already already activated - 403 [e-mail is used]
-        db.close()
+    elif results[0][0] == 1:  # If e-mail already already activated - 403 [e-mail is used]
         return simple_response(403, "error", "This account is already activated")
 
     else:    # Send new activation code
         verification_code =  random_string_generator(70)
-        verification_code = db.escape(verification_code)
+        escaped_verification_code = db.escape(verification_code)
 
         query = """UPDATE users
                    SET verification_code="{VERIFICATION_CODE}"
-                   WHERE email="{MAIL}" """.format(VERIFICATION_CODE = verification_code, MAIL = escacped_user_mail)
-
+                   WHERE email="{MAIL}" """.format(VERIFICATION_CODE = escaped_verification_code, MAIL = escaped_user_mail)
         cursor.execute(query)    # Changing activation key
         db.commit()
-        db.close()
 
         verification_URL = URL + '/api/verify?code=' + verification_code
-
         send_email(verification_URL, project_mail, project_mail_password, user_mail) # Sending link to verify e-mail
 
         return simple_response(200, "success", "Check your mailbox for new activation code. It may be in spam folder.")
@@ -380,11 +333,6 @@ def sign_in():
 
     user_mail = request.args.get('mail')
     user_password = request.args.get('password')
-    project_salt = get_setting(path, 'Settings', 'salt')
-
-    db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
-                                                                   database="pony_color_db", charset="utf8")
-    cursor = db.cursor()
     escaped_user_mail = db.escape(user_mail)
     user_password = db.escape(user_password)
 
@@ -393,17 +341,14 @@ def sign_in():
     cursor.execute(query)
     results = cursor.fetchall()
 
-    if results is ():  # Here we come if there is no such e-mail in DB.
-        db.close()
+    if not results:  # Here we come if there is no such e-mail in DB.
         return simple_response(403, "error", "No such user in database")
 
-    elif results[0] == 0: # If account not activated
-        db.close()
+    elif results[0][0] == 0: # If account not activated
         return simple_response(403, "error", "E-mail is not activated")
 
     else:  # If account activated - check password
-        hash = results[0][1]
-        hash = hash.encode()
+        hash = results[0][1].encode()
         salt_one = results[0][2]
         password = project_salt + user_password + salt_one             ######## THIS IS HOW PASSWORDS ########
         if bcrypt.checkpw(password.encode(), hash):                    ########    MUST BE CHECKED    ########
@@ -411,45 +356,41 @@ def sign_in():
             value = random_string_generator(43)
             escaped_value = db.escape(value)
             expire_date = expires(1)
-            print('value length = ' + str(len(escaped_value)))
-            print('timestamp length = ' + str(len(expire_date)))
 
             query = """INSERT INTO sessions (value, time_stamp)
-                       VALUES ("{VALUE}", "{TIME_STAMP}") """.format(\
-                                                    VALUE = escaped_value, TIME_STAMP = expire_date)
-            print(query)
+                       VALUES ("{VALUE}", "{TIME_STAMP}") """.format(VALUE = escaped_value, TIME_STAMP = expire_date)
             cursor.execute(query)
             db.commit()
-            db.close()
 
-            URL = get_setting(path, 'Settings', 'URL')
-            my_cookie = {'domain':URL,
-                         'expires':expire_date,
-                         'name':'pony_color_determinator',
-                         'path':'/',
-                         'value': value,
-                         'version':0}
-
-            return simple_response(200, "success", "Signed in successfully").set_cookie(my_cookie)
+            response = simple_response(200, "success", "Signed in successfully")
+            response.set_cookie('pony_color_determinator', value=value, max_age=None, expires=expire_date, path='/',\
+                                 domain=None, secure=False, httponly=False, samesite=None) # Because  .set_cookie() doesn't return 'response' object
+            return response
 
         else:    # If password doesn't match
-            db.close()
             return simple_response(403, "error", "Wrong password")
 
 
 @app.route('/api/signout')
 def sign_out():
     cookies = request.cookies
-    if 'value' in cookies:
-        db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
-                                                                   database="pony_color_db", charset="utf8")
-        escaped_value = db.escape(cookies['value'])
-        cursor = db.cursor()
-        query = """DELETE FROM sessions WHERE key="{KEY}" """.format(KEY = escaped_value)    # Find user, hash and salt in DB
+    if 'pony_color_determinator' in cookies:
+        escaped_value = db.escape(cookies['pony_color_determinator'])
+
+        query = """DELETE FROM sessions WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find user, hash and salt in DB
+
         cursor.execute(query)
         db.commit()
-        db.close()
         return simple_response(200, "success", "Signed out successfully")
+    else:
+        return simple_response(403, "error", "Not authorised")
 
 
-# Adress of fun: http://localhost:5000/api/get_pony_by_color?color=053550
+@atexit.register    # Closing DB connection when app shunting down
+def teardown_db():
+    if db is not None:
+        db.close()
+        print('DATABASE CLOSED')
+
+
+# Address of fun: http://localhost:5000/api/get_pony_by_color?color=053550
