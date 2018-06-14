@@ -1,4 +1,4 @@
-import configparser, pymysql, bcrypt, requests
+import configparser
 import os
 
 def create_config(path):
