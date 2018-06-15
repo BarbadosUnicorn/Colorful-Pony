@@ -1,41 +1,44 @@
 import imaplib
 import email
-import base64
 from online_determinator import get_setting
 
 path = "settings.ini"
 
 FROM_EMAIL = get_setting(path, 'Settings', 'project_mail')
 FROM_PWD = get_setting(path, 'Settings', 'mail_password')
-SMTP_SERVER = "imap.gmail.com"
 
 
-def read_email_from_gmail():
+def read_email_from_gmail(senders_address, mail_password, recipient_address):    # It searching for senders last message in recipients mailbox
     try:
-        mail = imaplib.IMAP4_SSL(SMTP_SERVER)
-        mail.login(FROM_EMAIL,FROM_PWD)
+        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        mail.login(recipient_address, mail_password)
         mail.select('inbox')
 
-        search_res = mail.search(None, 'ALL')
-        type, data = search_res
+        search_res = mail.search(None, '(FROM "<%s>")' % senders_address)
 
+        type, data = search_res
         mail_ids = data[0]
 
         id_list = mail_ids.split()
-        first_email_id = int(id_list[0])
-        latest_email_id = int(id_list[-1])
 
-        for i in range(latest_email_id,first_email_id, -1):
-            typ, data = mail.fetch(str(i).encode(), '(RFC822)' )
+        if not len(id_list) == 0:
+            latest_email_id = int(id_list[-1])
 
-            for response_part in data:
-                if isinstance(response_part, tuple):
-                    msg = email.message_from_bytes(data[0][1], _class = email.message.EmailMessage) #email.message_from_string(response_part[1])
-                    email_subject = msg['subject']
-                    email_from = msg['from']
-                    print('From : ' + email_from)
-                    print('Subject : ' + email_subject + '\n')
-        mail.logout()
+            status, data = mail.fetch(str(latest_email_id).encode(), '(RFC822)')
+
+            msg = email.message_from_bytes(data[0][1], _class = email.message.EmailMessage)
+
+            mail.logout()
+
+########################################################################################################################
+#                                 Make it able to delete all "senders" messages                                        #
+########################################################################################################################
+
+            return msg._payload
+        else:
+            mail.logout()
+
+            return ''
 
     except Exception as e:
         print('Exception:')
@@ -44,10 +47,10 @@ def read_email_from_gmail():
             mail.logout()
             print('Logged out')
         except Exception:
-            print("Can't close mail")
+            print("Unable to close mail-server connection")
 
 
-read_email_from_gmail()
+print(read_email_from_gmail(FROM_EMAIL, FROM_PWD,FROM_EMAIL))
 
 '''
 # Import the email modules we'll need
@@ -73,6 +76,7 @@ print('Body: %s' % body)
 print(headers.__dict__)
 '''
 '''
+import base64
 mail_list = mail.list()
         print("mail_list:")
         print(mail_list[1])
@@ -101,4 +105,32 @@ mail_list = mail.list()
         #encoded = payload_data.encode()
         #decoded = base64.b64decode(payload_data)
         #print(decoded.decode())
+'''
+'''
+status, data = mail.fetch(str(i).encode(), '(RFC822)')
+            #print("data[0][1].decode():")
+            #print(data[0][1].decode())    # To get message text as it looks in browser
+'''
+'''
+search_res = mail.search(None, '(FROM "<%s>")' % FROM_EMAIL)
+
+        type, data = search_res
+        mail_ids = data[0]
+
+        id_list = mail_ids.split()
+
+        if not len(id_list) == 0:
+            first_email_id = int(id_list[0])
+            latest_email_id = int(id_list[-1])
+
+            for i in range(latest_email_id,first_email_id-1, -1):
+                print("i = " + str(i))
+
+                status, data = mail.fetch(str(i).encode(), '(RFC822)')
+
+                msg = email.message_from_bytes(data[0][1], _class = email.message.EmailMessage)
+                print('msg._payload:')
+                print(msg._payload)
+        else:
+            print('No messages found')
 '''

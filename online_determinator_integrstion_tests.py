@@ -2,7 +2,8 @@ import os
 import online_determinator
 import unittest
 import tempfile
-
+import imaplib
+import email
 
 def signin(self, username, password):
     return self.app.post('/api/signin', data=dict(
@@ -13,6 +14,44 @@ def signin(self, username, password):
 
 def signout(self):
     return self.app.get('/api/signout', follow_redirects=True)
+
+
+def read_email_from_gmail(senders_address, mail_password, recipient_address):    # It searching for "senders" last message in "recipients" mailbox
+    try:
+        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        mail.login(recipient_address, mail_password)
+        mail.select('inbox')
+
+        search_res = mail.search(None, '(FROM "<%s>")' % senders_address)
+
+        type, data = search_res
+        mail_ids = data[0]
+
+        id_list = mail_ids.split()
+
+        if not len(id_list) == 0:
+            latest_email_id = int(id_list[-1])
+
+            status, data = mail.fetch(str(latest_email_id).encode(), '(RFC822)')
+
+            msg = email.message_from_bytes(data[0][1], _class = email.message.EmailMessage)
+
+            mail.logout()
+
+            return msg._payload
+        else:
+            mail.logout()
+
+            return ''
+
+    except Exception as e:
+        print('Exception:')
+        print(e)
+        try:
+            mail.logout()
+            print('Logged out')
+        except Exception:
+            print("Unable to close mail-server connection")
 
 
 class online_determinator_test_case(unittest.TestCase):
