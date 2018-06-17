@@ -101,7 +101,7 @@ def get_setting(path, section, setting):  # Get a setting
 
 
 def send_email(message_text, senders_address, mail_password, recipient_address):
-    if __name__ == '__main__':
+    if not app.testing:
         me = senders_address
         you = recipient_address
         smtp_server = 'smtp.gmail.com'
