@@ -101,18 +101,21 @@ def get_setting(path, section, setting):  # Get a setting
 
 
 def send_email(message_text, senders_address, mail_password, recipient_address):
-    me = senders_address
-    you = recipient_address
-    smtp_server = 'smtp.gmail.com'
-    msg = MIMEText(message_text)
-    msg['Subject'] = 'E-mail verification '
-    msg['From'] = me
-    msg['To'] = you
-    s = smtplib.SMTP(smtp_server)
-    s.starttls()
-    s.login(senders_address, mail_password)
-    s.sendmail(me, [you], msg.as_string())
-    s.quit()
+    if __name__ == '__main__':
+        me = senders_address
+        you = recipient_address
+        smtp_server = 'smtp.gmail.com'
+        msg = MIMEText(message_text)
+        msg['Subject'] = 'E-mail verification '
+        msg['From'] = me
+        msg['To'] = you
+        s = smtplib.SMTP(smtp_server)
+        s.starttls()
+        s.login(senders_address, mail_password)
+        s.sendmail(me, [you], msg.as_string())
+        s.quit()
+    else:
+        print('Function called from other program: no message sending allowed!')
 
 
 def random_string_generator(length):    # Making string of [A-Z, a-z, 0-9] with desired length. Len >= 0

@@ -8,7 +8,7 @@ FROM_EMAIL = get_setting(path, 'Settings', 'project_mail')
 FROM_PWD = get_setting(path, 'Settings', 'mail_password')
 
 
-def read_email_from_gmail(senders_address, mail_password, recipient_address):    # It searching for senders last message in recipients mailbox
+def read_email_from_gmail(senders_address, mail_password, recipient_address):    # It searching for senders last message in recipients mailbox, returns last one and delete all of them
     try:
         mail = imaplib.IMAP4_SSL("imap.gmail.com")
         mail.login(recipient_address, mail_password)
@@ -18,6 +18,7 @@ def read_email_from_gmail(senders_address, mail_password, recipient_address):   
 
         type, data = search_res
         mail_ids = data[0]
+        to_delete = mail_ids
 
         id_list = mail_ids.split()
 
@@ -28,11 +29,12 @@ def read_email_from_gmail(senders_address, mail_password, recipient_address):   
 
             msg = email.message_from_bytes(data[0][1], _class = email.message.EmailMessage)
 
-            mail.logout()
+            for id in id_list:
+                print(mail.store(id, '+FLAGS', '\\Deleted'))
 
-########################################################################################################################
-#                                 Make it able to delete all "senders" messages                                        #
-########################################################################################################################
+            print(mail.expunge())
+
+            mail.logout()
 
             return msg._payload
         else:
