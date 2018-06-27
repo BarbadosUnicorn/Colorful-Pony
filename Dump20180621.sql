@@ -135,8 +135,9 @@ CREATE TABLE `sessions` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `value` varchar(45) NOT NULL,
   `time_stamp` varchar(29) NOT NULL,
+  `user_id` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -145,6 +146,7 @@ CREATE TABLE `sessions` (
 
 LOCK TABLES `sessions` WRITE;
 /*!40000 ALTER TABLE `sessions` DISABLE KEYS */;
+INSERT INTO `sessions` VALUES (1,'\'R1hRjRdnkHOOmkN7ZksE7BHm7B6HWXPrUWtGa5YYoqf\'','Fri, 22-Jun-2018 19:03:36 GMT',18),(12,'\'MzRth7ukqvocAp87WBHtDNQMBvZ1rkmE92jTtPs5CUp\'','Fri, 22-Jun-2018 19:26:04 GMT',18),(13,'\'n4WGTVUggtFw7X1EmW5nh3LgZY5aNGvhZNel4LxoHbO\'','Fri, 22-Jun-2018 19:27:34 GMT',18),(14,'\'ggti3MC39A9JyUZRyG6rN24ztlfH5IBAcAbqUVlscXr\'','Fri, 22-Jun-2018 19:27:42 GMT',18);
 /*!40000 ALTER TABLE `sessions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -162,8 +164,9 @@ CREATE TABLE `users` (
   `salt_one` varchar(32) NOT NULL,
   `verification_code` varchar(72) NOT NULL,
   `active` tinyint(1) NOT NULL,
+  `role` varchar(16) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -172,6 +175,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
+INSERT INTO `users` VALUES (18,'\'xtraand0ne@gmail.com\'','$2b$12$oG6OZeeyYArkO8uj/Drc4OdYgFjLuYj6Zh4kXLQM8RGcqoHmVjspy','UcM6V49fYOE29Iat15LVhIqtehn4qBRx','\'zMZAADT4S6aRhOhThtx8Uy8oXTatiQvVecgGN2w9TKkfYrlEWXkZtlGRQrDRYgbayt2BrR\'',1,'admin'),(20,'\'pcolorfulpony@gmail.com\'','$2b$12$OHn/0k7sJaFlhPacQQaw..jY.OEJrcNDLTBOD1aclSi5wqzHb/GWu','F8TLpWaRgjkgpIKGFYUz3biwjoNT6gR5','\'rCxKjINK7zzjEMOKJli777LC1YE9MA4R5313d78Qk1WgGhOz7InFUNoFiH3vObXilZjzca\'',0,'user');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -184,4 +188,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2018-06-06 16:56:14
+-- Dump completed on 2018-06-21 23:02:36

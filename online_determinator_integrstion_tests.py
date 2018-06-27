@@ -26,7 +26,7 @@ class online_determinator_test_case(unittest.TestCase):
     # Methods of this class:
 
     def signin(self, mail, password):
-        return self.app.get('/api/signin?mail={MAIL}&password={PASSWORD}'.format(MAIL = mail, PASSWORD = password),    # It must be POST !!!
+        return self.app.post('/api/signin?mail={MAIL}&password={PASSWORD}'.format(MAIL = mail, PASSWORD = password),    # It must be POST !!!
                              follow_redirects=True)
 
     def signout(self):
@@ -52,6 +52,7 @@ class online_determinator_test_case(unittest.TestCase):
         assert b'Not authorised' in rv.data
 
         rv = self.signin(user1_mail, user1_password)
+        print(rv.data)
         assert b'Signed in successfully' in rv.data
        
         rv = self.signout()
@@ -70,6 +71,7 @@ class online_determinator_test_case(unittest.TestCase):
         rv = self.signin(user1_mail, user1_password)
 
         rv = self.app.get('/api/get_pony_by_color?color=053550')
+        #print(rv.data.decode())
         self.assertEqual(rv._status_code, 200)
 
         rv = self.app.get('/api/get_pony_by_color?color=#')
@@ -110,25 +112,34 @@ class online_determinator_test_case(unittest.TestCase):
         assert b'Invalid verification code.' in rv.data
 
     def test_signup(self):
-        rv = self.app.get('/api/signup?mail={MAIL}&password={PASSWORD}'.format(MAIL = user2_mail, PASSWORD = '1234'))
+        rv = self.app.post('/api/signup?mail={MAIL}&password={PASSWORD}'.format(MAIL = user2_mail, PASSWORD = '1234'))
         assert b'Password must be at least 8 symbols long.' in rv.data
 
-        rv = self.app.get('/api/signup?mail={MAIL}&password={PASSWORD}'.format(MAIL = 'BAZOONGAS', PASSWORD = '12345678'))
+        rv = self.app.post('/api/signup?mail={MAIL}&password={PASSWORD}'.format(MAIL = 'BAZOONGAS', PASSWORD = '12345678'))
         assert b"Email doesn't match RFC 6531 standards." in rv.data
 
-        rv = self.app.get('/api/signup?mail={MAIL}&password={PASSWORD}'.format(MAIL = user1_mail, PASSWORD = user1_password))
+        rv = self.app.post('/api/signup?mail={MAIL}&password={PASSWORD}'.format(MAIL = user1_mail, PASSWORD = user1_password))
         assert b"E-mail is used" in rv.data
 
-        rv = self.app.get('/api/signup?mail={MAIL}&password={PASSWORD}'.format(MAIL = user2_mail, PASSWORD = user2_password))
+        rv = self.app.post('/api/signup?mail={MAIL}&password={PASSWORD}'.format(MAIL = user2_mail, PASSWORD = user2_password))
         assert b"E-mail is not activated. Check your mailbox for new activation code. It may be in spam folder." in rv.data
 
-        rv = self.app.get('/api/signup?mail={MAIL}&password={PASSWORD}'.format(MAIL = 'example@gmail.com', PASSWORD = '12345678'))
+        rv = self.app.post('/api/signup?mail={MAIL}&password={PASSWORD}'.format(MAIL = 'example@gmail.com', PASSWORD = '12345678'))
         self.assertEqual(rv._status_code, 200)
 
         query = """DELETE FROM users WHERE email="{MAIL}" """.format(MAIL = "'example@gmail.com'")
 
         cursor.execute(query)
         db.commit()
+
+    def test_pony_viewer(self):
+        rv = self.signin(user1_mail, user1_password)
+
+        rv = self.app.get('/api/get_all_ponies?page={PAGE}&ponies_per_page={PPP}'.format(PAGE = 2, PPP = 3))
+        print("DATA:")
+        print(rv.data.decode())
+
+        rv = self.signout()
 
 
 @atexit.register    # Closing DB connection when app shunting down

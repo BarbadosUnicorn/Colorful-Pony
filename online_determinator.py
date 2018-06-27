@@ -115,7 +115,7 @@ def send_email(message_text, senders_address, mail_password, recipient_address):
         s.sendmail(me, [you], msg.as_string())
         s.quit()
     else:
-        print('Function called from other program: no message sending allowed!')
+        print('Message sending not allowed while testing!')
 
 
 def random_string_generator(length):    # Making string of [A-Z, a-z, 0-9] with desired length. Len >= 0
@@ -157,6 +157,36 @@ db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_passw
                                        database="pony_color_db", charset="utf8") # Connecting to DB when app started
 cursor = db.cursor()
 
+########################################################################################################################
+# Testing space
+'''
+listto = [1,2,{3: 33, 4: 44}]
+print(listto)
+print(len(listto))
+print(len(listto[2]))
+print(listto[2][3])
+listto[2][5] = [55, 55, 55] # Add value to dict
+print(listto)
+listto[2][5].append(555555) # Add value to list
+print(listto)
+print(str(listto))
+print(len(str(listto)))
+print(str(listto).encode())
+#
+print('Pony:')
+response =  [{"pony_id": 1, "pony_name": 'pony', "body_part": {'eye': [{'#000000': 'black'}]}}]
+pony_number = 0
+#print(response[pony_number])
+response[pony_number]["body_part"]['butt'] = [{'#FFFFFF': 'white'}]
+print(response[pony_number]["body_part"])
+print(response[pony_number]["body_part"]['eye'])
+response[pony_number]["body_part"]['eye'].append({'#FF0000': 'red'})
+print(response[pony_number]["body_part"]['eye'])
+print(response[pony_number]["body_part"]['eye'][0])
+print(response[pony_number]["pony_id"])
+'''
+########################################################################################################################
+
 
 @app.route('/api/get_pony_by_color')  # Function to find closest color in database.
 def closest_color_online_determinator():
@@ -170,7 +200,7 @@ def closest_color_online_determinator():
     else:
         escaped_value = db.escape(cookies['pony_color_determinator'])
 
-        query = """SELECT id FROM sessions WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find user, hash and salt in DB
+        query = """SELECT id FROM sessions WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find cookies in DB
 
         cursor.execute(query)
         results = cursor.fetchall()
@@ -199,22 +229,22 @@ def closest_color_online_determinator():
             cursor.execute(query)
             results = cursor.fetchall()
 
-            response = '[ '
+            response = []
             for row in results:
 
-                    #color_id    = row[0]
-                    color_name  = row[1]
-                    name        = row[2]
-                    body_part   = row[3]
-                    color       = row[4]
-                    response = response[:-1] + '{"body_part":"%s","color":"%s","name":"%s","color_name":"%s"},' %(body_part,\
-                                                                                        color, name, color_name)    # Concating objects to response
-                    response = response[:-1] + ']'    # JSON response is an array of objects
+                #color_id    = row[0]
+                color_name  = row[1]
+                name        = row[2]
+                body_part   = row[3]
+                color       = row[4]
 
-            return response
+                response_part = {"body_part": body_part, "color": color, "name": name, "color_name": color_name}
+                response.append(response_part)
+
+            return str(response)
 
 
-@app.route('/api/signup')   # Creates non-activated user in DB and sends activation code via link. Code also writes in DB. E-mail is username.
+@app.route('/api/signup', methods = ['POST'])   # Creates non-activated user in DB and sends activation code via link. Code also writes in DB. E-mail is username.
 def user_creator():
 
     user_mail = request.args.get('mail')
@@ -242,10 +272,11 @@ def user_creator():
         escaped_verification_code = db.escape(verification_code)
         active = 0
 
-        query = """INSERT INTO users (email, hash, salt_one, verification_code, active)
-                   VALUES ("{MAIL}", "{HASH}", "{SALT_ONE}", "{VERIFICATION_CODE}", "{ACTIVE}") """.format(\
+        query = """INSERT INTO users (email, hash, salt_one, verification_code, active, role)
+                   VALUES ("{MAIL}", "{HASH}", "{SALT_ONE}", "{VERIFICATION_CODE}", "{ACTIVE}", "{ROLE}") """.format(\
                                                     MAIL = escaped_user_mail, HASH = hash, SALT_ONE = salt_one, \
-                                                    VERIFICATION_CODE = escaped_verification_code, ACTIVE = active)
+                                                    VERIFICATION_CODE = escaped_verification_code, ACTIVE = active,\
+                                                    ROLE = 'user')
 
         cursor.execute(query)
         db.commit()    # Always commit changes!
@@ -331,7 +362,7 @@ def resend_verification_code():
         return simple_response(200, "success", "Check your mailbox for new activation code. It may be in spam folder.")
 
 
-@app.route('/api/signin')
+@app.route('/api/signin', methods = ['POST'])
 def sign_in():
 
     user_mail = request.args.get('mail')
@@ -339,7 +370,7 @@ def sign_in():
     escaped_user_mail = db.escape(user_mail)
     user_password = db.escape(user_password)
 
-    query = """SELECT active, hash, salt_one FROM users WHERE email="{MAIL}" """.format(MAIL = escaped_user_mail)    # Find user, hash and salt in DB
+    query = """SELECT active, hash, salt_one, id FROM users WHERE email="{MAIL}" """.format(MAIL = escaped_user_mail)    # Find user, hash and salt in DB
 
     cursor.execute(query)
     results = cursor.fetchall()
@@ -359,9 +390,12 @@ def sign_in():
             value = random_string_generator(43)
             escaped_value = db.escape(value)
             expire_date = expires(1)
+            user_id = results[0][3]
 
-            query = """INSERT INTO sessions (value, time_stamp)
-                       VALUES ("{VALUE}", "{TIME_STAMP}") """.format(VALUE = escaped_value, TIME_STAMP = expire_date)
+            query = """INSERT INTO sessions (value, time_stamp, user_id)
+                       VALUES ("{VALUE}", "{TIME_STAMP}", "{USER_ID}") """.format(VALUE = escaped_value,\
+                                                                                  TIME_STAMP = expire_date,\
+                                                                                  USER_ID = user_id)
             cursor.execute(query)
             db.commit()
 
@@ -374,7 +408,7 @@ def sign_in():
             return simple_response(403, "error", "Wrong password")
 
 
-@app.route('/api/signout')
+@app.route('/api/signout', methods = ['GET'])
 def sign_out():
     cookies = request.cookies
     if 'pony_color_determinator' in cookies:
@@ -387,6 +421,215 @@ def sign_out():
         return simple_response(200, "success", "Signed out successfully")
     else:
         return simple_response(403, "error", "Not authorised")
+
+###############################################################################################################################################################################################
+
+
+@app.route('/api/get_all_ponies', methods = ['GET'])  # Function to view all ponies in DB
+def pony_viewer():
+
+    page_number = request.args.get('page')
+    number_of_ponies = request.args.get('ponies_per_page')
+    cookies = request.cookies
+
+    if 'pony_color_determinator' not in cookies:
+        return simple_response(403, "error", "Not authorised")
+
+    else:
+        escaped_value = db.escape(cookies['pony_color_determinator'])
+
+        query = """SELECT id FROM sessions WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find cookies in DB
+
+        cursor.execute(query)
+        results = cursor.fetchall()
+
+        if not results:  # Here we come if user not logged in.
+            return simple_response(403, "error", "Not authorised")
+
+        else:    # Here we come if everything OK.
+            try:
+                page_number = int(page_number)
+                number_of_ponies = int(number_of_ponies)
+                if page_number <= 0 or number_of_ponies <= 0: raise ValueError
+
+            except ValueError:
+                return simple_response(403, "error", "Page and ponies_per_page should be integer")
+
+            query = """SELECT id
+                       FROM pony"""  # To get all pony id's
+
+            cursor.execute(query)
+            results = cursor.fetchall()
+
+            ponies_total = len(results)
+            start_id = number_of_ponies * (page_number - 1)
+
+            if start_id > ponies_total:
+                return simple_response(403, "error", "There is only %s ponies in database!" % str(ponies_total))
+
+            end_id = start_id + number_of_ponies -1
+
+            if end_id >= ponies_total:
+                end_id = ponies_total - 1
+
+            first_pony_id = results[start_id][0]
+            last_pony_id  = results[end_id][0]
+
+            query = """SELECT pony.id, pony.name, body_part.name, color.RGB, color.name
+                       FROM pony_color
+                       INNER JOIN color     ON pony_color.color_id = color.id
+                       INNER JOIN pony      ON pony_color.pony_id  = pony.id
+                       INNER JOIN body_part ON pony_color.type_id  = body_part.id
+                       WHERE pony.id >= {START}
+                       GROUP BY pony.id, body_part.id, color_id
+                       HAVING pony.id <= {END};""".format(START = first_pony_id, END = last_pony_id)
+
+            cursor.execute(query)
+            results = cursor.fetchall()
+
+            response = []  # After that we have list of rows that named below. By comparing each one to the previous right response object must be assembled!
+
+            for row in results:  # This is cycle for reading data from SQL server
+                    pony_id    = row[0]
+                    pony_name  = row[1]
+                    body_part  = row[2]
+                    RGB_color  = row[3]
+                    color_name = row[4]
+
+                    if len(response) == 0:  # Dumb thing to write first pony in response
+                        response_part = {"pony_id": pony_id, "pony_name": pony_name, "body_part": {body_part: [{RGB_color: color_name}]}}
+                        response.append(response_part)
+
+                    pony_in_response = False
+
+                    for pony_number in range(len(response)):  # This is cycle to check all ponies that already in response list
+                        if response[pony_number]['pony_id'] == pony_id:  # If statement to compare id numbers
+                            pony_in_response = True
+                            founded_pony_number = pony_number
+
+                    if pony_in_response:  # If pony founded - going to check body parts
+                        if body_part in response[founded_pony_number]["body_part"]: # if current body part in pony's body parts dict of response - add new color for it
+                            color_in_body_part = False
+
+                            for color in range(len(response[founded_pony_number]["body_part"][body_part])):
+                                if RGB_color in response[founded_pony_number]["body_part"][body_part][color]:
+                                    color_in_body_part = True
+
+                            if not color_in_body_part:  # If no such color in body parts - add it
+                                response[founded_pony_number]["body_part"][body_part].append({RGB_color: color_name})  # Add new color to body_part
+
+                        else:  # If there is no such body parts
+                            response[founded_pony_number]["body_part"][body_part] = [{RGB_color: color_name}]  # Add new body_part
+
+                    else:  # If pony not founded in response list - add it
+                        response_part = {"pony_id": pony_id, "pony_name": pony_name, "body_part": {body_part: [{RGB_color: color_name}]}}
+                        response.append(response_part)
+
+            return str(response)
+
+
+@app.route('/api/edit_pony', methods = ['POST', 'PUT', 'DELETE'])    # Editing ponies data in DB
+def pony_editor():
+
+    cookies = request.cookies
+
+    if 'pony_color_determinator' not in cookies:
+        return simple_response(403, "error", "Not authorised")
+
+    else:
+        escaped_value = db.escape(cookies['pony_color_determinator'])
+
+        query = """SELECT users.role
+                   FROM sessions
+                   INNER JOIN users     ON sessions.user_id = users.id
+                   WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find users role in DB
+
+        cursor.execute(query)
+        results = cursor.fetchall()
+
+        if not results:  # Here we come if user not logged in.
+            return simple_response(403, "error", "Not authorised")
+
+        elif results[0][0] == 'user':    # Here we come if role 'user'
+            return simple_response(403, "error", "Pony editing allowed only for admin's")
+
+        else:  # If role is 'admin'
+            if request.method == 'POST':
+                return simple_response(200, "success", "Here comes pony adding")
+
+            elif request.method == 'PUT':
+                return simple_response(200, "success", "Here comes pony editing")
+
+            elif request.method == 'DELETE':
+                return simple_response(200, "success", "Here is how pony become deleted")
+
+        query = '''DELETE s 
+                   FROM spawnlist AS s 
+                   INNER JOIN npc AS n ON s.npc_templateid = n.idTemplate 
+                   WHERE n.type = "monster";'''
+
+
+@app.route('/api/edit_role', methods = ['PUT'])    # Editing ponies data in DB
+def role_editor():
+
+    cookies = request.cookies
+
+    if 'pony_color_determinator' not in cookies:
+        return simple_response(403, "error", "Not authorised")
+
+    else:
+        escaped_value = db.escape(cookies['pony_color_determinator'])
+
+        query = """SELECT users.role
+                   FROM sessions
+                   INNER JOIN users     ON sessions.user_id = users.id
+                   WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find users role in DB
+
+        cursor.execute(query)
+        results = cursor.fetchall()
+
+        if not results:  # Here we come if user not logged in.
+            return simple_response(403, "error", "Not authorised")
+
+        elif results[0][0] == 'user':    # Here we come if role 'user'
+            return simple_response(403, "error", "Role editing allowed only for admin's")
+
+        else:  # If role is 'admin'
+            if request.method == 'PUT':
+                return simple_response(200, "success", "Here comes role editing")
+
+
+@app.route('/api/ban', methods = ['POST', 'DELETE'])    # Editing ponies data in DB
+def ban_editor():
+
+    cookies = request.cookies
+
+    if 'pony_color_determinator' not in cookies:
+        return simple_response(403, "error", "Not authorised")
+
+    else:
+        escaped_value = db.escape(cookies['pony_color_determinator'])
+
+        query = """SELECT users.role
+                   FROM sessions
+                   INNER JOIN users     ON sessions.user_id = users.id
+                   WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find users role in DB
+
+        cursor.execute(query)
+        results = cursor.fetchall()
+
+        if not results:  # Here we come if user not logged in.
+            return simple_response(403, "error", "Not authorised")
+
+        elif results[0][0] == 'user':    # Here we come if role 'user'
+            return simple_response(403, "error", "Banning allowed only for admin's")
+
+        else:  # If role is 'admin'
+            if request.method == 'POST':
+                return simple_response(200, "success", "Here comes user ban")
+
+            elif request.method == 'DELETE':
+                return simple_response(200, "success", "Here is how user become unbanned")
 
 
 @atexit.register    # Closing DB connection when app shunting down
