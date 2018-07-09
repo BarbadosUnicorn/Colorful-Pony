@@ -1,4 +1,4 @@
-import atexit, bcrypt, configparser, os, pymysql, random, re, smtplib, string, time
+import atexit, bcrypt, configparser, json, os, pymysql, random, re, smtplib, string, time
 from flask import Flask, jsonify, request
 from email.mime.text import MIMEText
 
@@ -157,34 +157,44 @@ db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_passw
                                        database="pony_color_db", charset="utf8") # Connecting to DB when app started
 cursor = db.cursor()
 
+
+def role_finder(cookies):  # Roles are 'user' or 'admin'. If resp['code'] == 200 - user logged in.
+    resp = {'role': '', 'code': 403, 'description': 'error', 'message': ''}
+
+    if 'pony_color_determinator' not in cookies:  # If you have no cookies
+        resp['message'] = "Not authorised"
+        return resp
+
+    else:
+        escaped_value = db.escape(cookies['pony_color_determinator'])
+
+        query = """SELECT users.role, users.ban, users.email, users.active
+                   FROM sessions
+                   INNER JOIN users     ON sessions.user_id = users.id
+                   WHERE value="{VALUE}" """.format(VALUE = escaped_value)  # Find users role in DB
+
+        cursor.execute(query)
+        results = cursor.fetchall()
+
+        if not results:  # Here we come if user not logged in.
+            resp['message'] = "Not authorised"
+            return resp
+
+        elif results[0][3] == 2:  # Here we come user banned permanently
+            resp['message'] = "You are banned permanently"
+            return resp
+
+        elif results[0][1] > int(time.time()):  # Here we come user banned
+            resp['message'] = "You are banned until: %s UTC" \
+                              %time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(results[0][1])))
+            return resp
+
+        else:    # Here we come user logged in
+            resp = {'role': results[0][0], 'code': 200, 'description': 'success', 'message': 'Role founded', 'email': results[0][2]}
+            return resp
+
 ########################################################################################################################
-# Testing space
-'''
-listto = [1,2,{3: 33, 4: 44}]
-print(listto)
-print(len(listto))
-print(len(listto[2]))
-print(listto[2][3])
-listto[2][5] = [55, 55, 55] # Add value to dict
-print(listto)
-listto[2][5].append(555555) # Add value to list
-print(listto)
-print(str(listto))
-print(len(str(listto)))
-print(str(listto).encode())
-#
-print('Pony:')
-response =  [{"pony_id": 1, "pony_name": 'pony', "body_part": {'eye': [{'#000000': 'black'}]}}]
-pony_number = 0
-#print(response[pony_number])
-response[pony_number]["body_part"]['butt'] = [{'#FFFFFF': 'white'}]
-print(response[pony_number]["body_part"])
-print(response[pony_number]["body_part"]['eye'])
-response[pony_number]["body_part"]['eye'].append({'#FF0000': 'red'})
-print(response[pony_number]["body_part"]['eye'])
-print(response[pony_number]["body_part"]['eye'][0])
-print(response[pony_number]["pony_id"])
-'''
+
 ########################################################################################################################
 
 
@@ -193,55 +203,45 @@ def closest_color_online_determinator():
 
     color_input = request.args.get('color')
     cookies = request.cookies
+    role = role_finder(cookies)
 
-    if 'pony_color_determinator' not in cookies:
-        return simple_response(403, "error", "Not authorised")
+    if role['code'] == 403:
+        return simple_response(role['code'], role['description'], role['message'])
 
-    else:
-        escaped_value = db.escape(cookies['pony_color_determinator'])
+    else:    # Here we come if everything OK.
+        try:
+            color = color_retriever(color_input)    # Try-except block for better input color processing
 
-        query = """SELECT id FROM sessions WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find cookies in DB
+        except:
+            return simple_response(403, "error", "Invalid color code.")
+
+        color = RGBtoLab(color)
+
+        query =  """SELECT color.id, color.name, pony.name, body_part.name, color.RGB
+                    FROM pony_color
+                    INNER JOIN color     ON pony_color.color_id = color.id
+                    INNER JOIN pony      ON pony_color.pony_id  = pony.id
+                    INNER JOIN body_part ON pony_color.type_id  = body_part.id
+                    GROUP BY color.id, pony.id, body_part.id
+                    ORDER BY MIN((L - {L})*(L - {L})+(a - {a})*(a - {a})+(b - {b})*(b - {b})) LIMIT 1""".format(L = color['L'],\
+                                                                                                  a = color['a'], b = color['b'])
 
         cursor.execute(query)
         results = cursor.fetchall()
 
-        if not results:  # Here we come if user not logged in.
-            return simple_response(403, "error", "Not authorised")
+        response = []
+        for row in results:
 
-        else:    # Here we come if everything OK.
-            try:
-                color = color_retriever(color_input)    # Try-except block for better input color processing
+            #color_id    = row[0]
+            color_name  = row[1]
+            name        = row[2]
+            body_part   = row[3]
+            color       = row[4]
 
-            except:
-                return simple_response(403, "error", "Invalid color code.")
+            response_part = {"body_part": body_part, "color": color, "name": name, "color_name": color_name}
+            response.append(response_part)
 
-            color = RGBtoLab(color)
-
-            query = """SELECT color.id, color.name, pony.name, body_part.name, color.RGB
-                      FROM pony_color
-                      INNER JOIN color     ON pony_color.color_id = color.id
-                      INNER JOIN pony      ON pony_color.pony_id  = pony.id
-                      INNER JOIN body_part ON pony_color.type_id  = body_part.id
-                      GROUP BY color.id, pony.id, body_part.id
-                      ORDER BY MIN((L - {L})*(L - {L})+(a - {a})*(a - {a})+(b - {b})*(b - {b})) LIMIT 1""".format(L = color['L'],\
-                                                                                                  a = color['a'], b = color['b'])
-
-            cursor.execute(query)
-            results = cursor.fetchall()
-
-            response = []
-            for row in results:
-
-                #color_id    = row[0]
-                color_name  = row[1]
-                name        = row[2]
-                body_part   = row[3]
-                color       = row[4]
-
-                response_part = {"body_part": body_part, "color": color, "name": name, "color_name": color_name}
-                response.append(response_part)
-
-            return str(response)
+        return str(response)
 
 
 @app.route('/api/signup', methods = ['POST'])   # Creates non-activated user in DB and sends activation code via link. Code also writes in DB. E-mail is username.
@@ -370,7 +370,9 @@ def sign_in():
     escaped_user_mail = db.escape(user_mail)
     user_password = db.escape(user_password)
 
-    query = """SELECT active, hash, salt_one, id FROM users WHERE email="{MAIL}" """.format(MAIL = escaped_user_mail)    # Find user, hash and salt in DB
+    query = """SELECT active, hash, salt_one, id, ban
+               FROM users
+               WHERE email="{MAIL}" """.format(MAIL = escaped_user_mail)    # Find user, hash and salt in DB
 
     cursor.execute(query)
     results = cursor.fetchall()
@@ -380,6 +382,13 @@ def sign_in():
 
     elif results[0][0] == 0: # If account not activated
         return simple_response(403, "error", "E-mail is not activated")
+
+    elif results[0][4] > int(time.time()): # If user is banned
+        return simple_response(403, "error", "You are banned until: %s UTC" \
+                              %time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(results[0][4]))))
+
+    elif results[0][1] == 2:  # If user is banned permanently
+         return simple_response(403, "error", "You are banned permanently")
 
     else:  # If account activated - check password
         hash = results[0][1].encode()
@@ -402,6 +411,16 @@ def sign_in():
             response = simple_response(200, "success", "Signed in successfully")
             response.set_cookie('pony_color_determinator', value=value, max_age=None, expires=expire_date, path='/',\
                                  domain=None, secure=False, httponly=False, samesite=None) # Because  .set_cookie() doesn't return 'response' object
+
+            if results[0][4] != '':  # If user was banned
+
+                query = """UPDATE users 
+                           SET ban = ""
+                           WHERE email="{USER_ID}" """.format(USER_ID = user_id)
+
+                cursor.execute(query)
+                db.commit()
+
             return response
 
         else:    # If password doesn't match
@@ -410,7 +429,9 @@ def sign_in():
 
 @app.route('/api/signout', methods = ['GET'])
 def sign_out():
+
     cookies = request.cookies
+
     if 'pony_color_determinator' in cookies:
         escaped_value = db.escape(cookies['pony_color_determinator'])
 
@@ -422,7 +443,7 @@ def sign_out():
     else:
         return simple_response(403, "error", "Not authorised")
 
-###############################################################################################################################################################################################
+########################################################################################################################
 
 
 @app.route('/api/get_all_ponies', methods = ['GET'])  # Function to view all ponies in DB
@@ -431,205 +452,263 @@ def pony_viewer():
     page_number = request.args.get('page')
     number_of_ponies = request.args.get('ponies_per_page')
     cookies = request.cookies
+    role = role_finder(cookies)
 
-    if 'pony_color_determinator' not in cookies:
-        return simple_response(403, "error", "Not authorised")
+    if role['code'] == 403:
+        return simple_response(role['code'], role['description'], role['message'])
 
     else:
-        escaped_value = db.escape(cookies['pony_color_determinator'])
+        try:
+            page_number = int(page_number)
+            number_of_ponies = int(number_of_ponies)
+            if page_number <= 0 or number_of_ponies <= 0: raise ValueError
 
-        query = """SELECT id FROM sessions WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find cookies in DB
+        except ValueError:
+            return simple_response(403, "error", "Page and ponies_per_page should be integer")
+
+        query = """SELECT id
+                   FROM pony"""  # To get all pony_id's
 
         cursor.execute(query)
         results = cursor.fetchall()
 
-        if not results:  # Here we come if user not logged in.
-            return simple_response(403, "error", "Not authorised")
+        ponies_total = len(results)
+        start_id = number_of_ponies * (page_number - 1)
 
-        else:    # Here we come if everything OK.
-            try:
-                page_number = int(page_number)
-                number_of_ponies = int(number_of_ponies)
-                if page_number <= 0 or number_of_ponies <= 0: raise ValueError
+        if start_id > ponies_total:
+            return simple_response(403, "error", "There is only %s ponies in database!" % str(ponies_total))
 
-            except ValueError:
-                return simple_response(403, "error", "Page and ponies_per_page should be integer")
+        end_id = start_id + number_of_ponies -1
 
-            query = """SELECT id
-                       FROM pony"""  # To get all pony id's
+        if end_id >= ponies_total:
+            end_id = ponies_total - 1
 
-            cursor.execute(query)
-            results = cursor.fetchall()
+        first_pony_id = results[start_id][0]
+        last_pony_id  = results[end_id][0]
 
-            ponies_total = len(results)
-            start_id = number_of_ponies * (page_number - 1)
+        query = """SELECT pony.id, pony.name, body_part.name, color.RGB, color.name
+                   FROM pony_color
+                   INNER JOIN color     ON pony_color.color_id = color.id
+                   INNER JOIN pony      ON pony_color.pony_id  = pony.id
+                   INNER JOIN body_part ON pony_color.type_id  = body_part.id
+                   WHERE pony.id >= {START}
+                   GROUP BY pony.id, body_part.id, color_id
+                   HAVING pony.id <= {END};""".format(START = first_pony_id, END = last_pony_id)
 
-            if start_id > ponies_total:
-                return simple_response(403, "error", "There is only %s ponies in database!" % str(ponies_total))
+        cursor.execute(query)
+        results = cursor.fetchall()
 
-            end_id = start_id + number_of_ponies -1
+        pony_dict = {}
+        for line in results:
 
-            if end_id >= ponies_total:
-                end_id = ponies_total - 1
+            pony_id,  pony_name,  body_part,  RGB_color,  color_name = line[0], line[1], line[2], line[3], line[4]
 
-            first_pony_id = results[start_id][0]
-            last_pony_id  = results[end_id][0]
+            if pony_id in pony_dict:  # Searching for 'pony_id' in dictionary
+                if body_part in pony_dict[pony_id]["body_part"]:  # Searching for 'body_part' in 'body_parts' of current pony in dictionary
+                    pony_dict[pony_id]["body_part"][body_part].append({RGB_color: color_name})  # If we have this 'body_part' - adding current 'color_dict' to 'color_list'
+                else:
+                    pony_dict[pony_id]["body_part"][body_part] = [{RGB_color: color_name}]  # If no such 'body_part' - adding current 'body_part' to 'body_part_dictionary'
+            else:
+                pony_dict[pony_id] = {"pony_id": pony_id, "pony_name": pony_name, "body_part": {body_part: [{RGB_color: color_name}]}}  # If no such 'pony' - add it to 'pony_dict'
 
-            query = """SELECT pony.id, pony.name, body_part.name, color.RGB, color.name
-                       FROM pony_color
-                       INNER JOIN color     ON pony_color.color_id = color.id
-                       INNER JOIN pony      ON pony_color.pony_id  = pony.id
-                       INNER JOIN body_part ON pony_color.type_id  = body_part.id
-                       WHERE pony.id >= {START}
-                       GROUP BY pony.id, body_part.id, color_id
-                       HAVING pony.id <= {END};""".format(START = first_pony_id, END = last_pony_id)
+        response = list(pony_dict.values())  # ~~~Dark magic of converting dictionaries to lists~~~
 
-            cursor.execute(query)
-            results = cursor.fetchall()
-
-            response = []  # After that we have list of rows that named below. By comparing each one to the previous right response object must be assembled!
-
-            for row in results:  # This is cycle for reading data from SQL server
-                    pony_id    = row[0]
-                    pony_name  = row[1]
-                    body_part  = row[2]
-                    RGB_color  = row[3]
-                    color_name = row[4]
-
-                    if len(response) == 0:  # Dumb thing to write first pony in response
-                        response_part = {"pony_id": pony_id, "pony_name": pony_name, "body_part": {body_part: [{RGB_color: color_name}]}}
-                        response.append(response_part)
-
-                    pony_in_response = False
-
-                    for pony_number in range(len(response)):  # This is cycle to check all ponies that already in response list
-                        if response[pony_number]['pony_id'] == pony_id:  # If statement to compare id numbers
-                            pony_in_response = True
-                            founded_pony_number = pony_number
-
-                    if pony_in_response:  # If pony founded - going to check body parts
-                        if body_part in response[founded_pony_number]["body_part"]: # if current body part in pony's body parts dict of response - add new color for it
-                            color_in_body_part = False
-
-                            for color in range(len(response[founded_pony_number]["body_part"][body_part])):
-                                if RGB_color in response[founded_pony_number]["body_part"][body_part][color]:
-                                    color_in_body_part = True
-
-                            if not color_in_body_part:  # If no such color in body parts - add it
-                                response[founded_pony_number]["body_part"][body_part].append({RGB_color: color_name})  # Add new color to body_part
-
-                        else:  # If there is no such body parts
-                            response[founded_pony_number]["body_part"][body_part] = [{RGB_color: color_name}]  # Add new body_part
-
-                    else:  # If pony not founded in response list - add it
-                        response_part = {"pony_id": pony_id, "pony_name": pony_name, "body_part": {body_part: [{RGB_color: color_name}]}}
-                        response.append(response_part)
-
-            return str(response)
+        return str(response)
 
 
 @app.route('/api/edit_pony', methods = ['POST', 'PUT', 'DELETE'])    # Editing ponies data in DB
 def pony_editor():
 
     cookies = request.cookies
+    role = role_finder(cookies)
 
-    if 'pony_color_determinator' not in cookies:
-        return simple_response(403, "error", "Not authorised")
+    if role['code'] == 403:
+        return simple_response(role['code'], role['description'], role['message'])
 
-    else:
-        escaped_value = db.escape(cookies['pony_color_determinator'])
+    elif role['role'] == 'user':    # Here we come if role 'user'
+        return simple_response(role['code'], role['description'], "Pony editing allowed only for admin's")
 
-        query = """SELECT users.role
-                   FROM sessions
-                   INNER JOIN users     ON sessions.user_id = users.id
-                   WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find users role in DB
+    else:  # If role is 'admin'
+        if request.method == 'POST':  # adding
+            # parse 'pony object', disassemble it, create pony_object entry                                   DONE
+            # create lists of content for pony, color and pony_color,                                         PROCESSING
+            # search for same name and colors, modify list for pony_color
+            # add data
+            pony_input = request.args.get('pony')
 
-        cursor.execute(query)
-        results = cursor.fetchall()
+            try:
+                pony_object = json.loads(pony_input)
 
-        if not results:  # Here we come if user not logged in.
-            return simple_response(403, "error", "Not authorised")
+            except:
+                try:
+                    pony_object = json.loads(pony_input.replace("'", '"'))  # Change all ' to ". Because parser is dumb.
 
-        elif results[0][0] == 'user':    # Here we come if role 'user'
-            return simple_response(403, "error", "Pony editing allowed only for admin's")
+                except:  # Here we come if input is not JSON
+                    return simple_response(403, "error", "Wrong pony object. You can see example on /api/get_all_ponies")
 
-        else:  # If role is 'admin'
-            if request.method == 'POST':
-                return simple_response(200, "success", "Here comes pony adding")
+            pony_object  = pony_object  # Now it's pony_object like:
+# {'pony_id': 4, 'pony_name': 'Pinkie Pie', 'body_part': {'body': [{'#F3B6CF': 'Амарантово-розовый'}], 'hair': [{'#ED458B': 'Глубокий пурпурно-розовый'}], 'eye': [{'#186F98': 'Небесно-синий'}, {'#82D1F4': 'Светло-голубой'}]}}
+            pony_name = pony_object['pony_name']
 
-            elif request.method == 'PUT':
-                return simple_response(200, "success", "Here comes pony editing")
+            query = """INSERT INTO pony (name) VALUES ("{NAME}") """.format(NAME = pony_name)
+            cursor.execute(query)
+            db.commit()
 
-            elif request.method == 'DELETE':
-                return simple_response(200, "success", "Here is how pony become deleted")
-
-        query = '''DELETE s 
-                   FROM spawnlist AS s 
-                   INNER JOIN npc AS n ON s.npc_templateid = n.idTemplate 
-                   WHERE n.type = "monster";'''
+            query = """SELECT id FROM pony WHERE name = "{NAME}" """.format(NAME = pony_name)
+            cursor.execute(query)
+            results = cursor.fetchall()
+            id = results[0][0]  # New pony's id
 
 
-@app.route('/api/edit_role', methods = ['PUT'])    # Editing ponies data in DB
+
+            return simple_response(200, "success", "Here comes pony adding")
+
+        elif request.method == 'PUT':  # editing
+            return simple_response(200, "success", "Here comes pony editing")
+
+        elif request.method == 'DELETE':  # deleting
+            return simple_response(200, "success", "Here is how pony become deleted")
+
+    query = '''DELETE s 
+               FROM spawnlist AS s 
+               INNER JOIN npc AS n ON s.npc_templateid = n.idTemplate 
+               WHERE n.type = "monster";'''
+
+
+@app.route('/api/edit_role', methods = ['PUT'])    # Editing user roles in DB
 def role_editor():
 
+    set_role = request.args.get('role')
+    mail = request.args.get('mail')
+    escaped_mail = db.escape(mail)
     cookies = request.cookies
+    role = role_finder(cookies)
 
-    if 'pony_color_determinator' not in cookies:
-        return simple_response(403, "error", "Not authorised")
+    if role['code'] == 403:
+        return simple_response(role['code'], role['description'], role['message'])
 
-    else:
-        escaped_value = db.escape(cookies['pony_color_determinator'])
+    elif role['role'] == 'user':    # Here we come if role 'user'
+        return simple_response(role['code'], role['description'], "Role editing allowed only for admin's")
 
-        query = """SELECT users.role
-                   FROM sessions
-                   INNER JOIN users     ON sessions.user_id = users.id
-                   WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find users role in DB
+    elif role['email'] == escaped_mail:
+        return simple_response(403, 'error', "You can't edit your own role")
 
-        cursor.execute(query)
-        results = cursor.fetchall()
+    else:  # If role is 'admin'
+        if request.method == 'PUT':
 
-        if not results:  # Here we come if user not logged in.
-            return simple_response(403, "error", "Not authorised")
+            query = """SELECT active
+                       FROM users
+                       WHERE email="{MAIL}" """.format(MAIL = escaped_mail)
 
-        elif results[0][0] == 'user':    # Here we come if role 'user'
-            return simple_response(403, "error", "Role editing allowed only for admin's")
+            cursor.execute(query)
+            results = cursor.fetchall()
 
-        else:  # If role is 'admin'
-            if request.method == 'PUT':
-                return simple_response(200, "success", "Here comes role editing")
+            if not results:
+                return simple_response(403, 'error', 'User not found')
+
+            elif results[0][0] == 0:
+                return simple_response(403, 'error', "Can't edit role of not activated users")
+
+            elif results[0][0] == 2:
+                return simple_response(403, 'error', "Can't edit role of banned users")
+
+            elif set_role == 'admin' or set_role == 'user':
+
+                query = """UPDATE users 
+                           SET role = {ROLE}
+                           WHERE email="{MAIL}" """.format(ROLE = set_role, MAIL = escaped_mail)
+
+                cursor.execute(query)
+                db.commit()
+                return simple_response(200, "success", "Role edited")
+
+            else:
+                return simple_response(403, 'error', "Role %s is not allowed" %set_role)
 
 
-@app.route('/api/ban', methods = ['POST', 'DELETE'])    # Editing ponies data in DB
+@app.route('/api/ban', methods = ['POST', 'DELETE'])    # Banhammer: active == 2 - is 'permaban'
 def ban_editor():
 
+    mail = request.args.get('mail')
+    escaped_mail = db.escape(mail)
+    timestamp_input = request.args.get('unix_timestamp')
     cookies = request.cookies
+    role = role_finder(cookies)
 
-    if 'pony_color_determinator' not in cookies:
-        return simple_response(403, "error", "Not authorised")
+    if role['code'] == 403:
+        return simple_response(role['code'], role['description'], role['message'])
 
-    else:
-        escaped_value = db.escape(cookies['pony_color_determinator'])
+    elif role['role'] == 'user':    # Here we come if role 'user'
+        return simple_response(role['code'], role['description'], "Banning allowed only for admin's")
 
-        query = """SELECT users.role
-                   FROM sessions
-                   INNER JOIN users     ON sessions.user_id = users.id
-                   WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find users role in DB
+    elif role['email'] == escaped_mail:
+        return simple_response(403, 'error', "You can't ban yourself")
+
+    else:  # If role is 'admin'
+
+        query = """SELECT ban, active
+                   FROM users
+                   WHERE email="{MAIL}" """.format(MAIL = escaped_mail)
 
         cursor.execute(query)
         results = cursor.fetchall()
 
-        if not results:  # Here we come if user not logged in.
-            return simple_response(403, "error", "Not authorised")
+        if not results:
+            return simple_response(403, 'error', 'User not found')
 
-        elif results[0][0] == 'user':    # Here we come if role 'user'
-            return simple_response(403, "error", "Banning allowed only for admin's")
+        elif results[0][1] == 0:
+            return simple_response(403, 'error', "Can't ban not activated users")
 
-        else:  # If role is 'admin'
-            if request.method == 'POST':
-                return simple_response(200, "success", "Here comes user ban")
+        elif results[0][0] > int(time.time()):  # If user is banned
 
-            elif request.method == 'DELETE':
-                return simple_response(200, "success", "Here is how user become unbanned")
+            if request.method == 'DELETE':
+
+                query = """UPDATE users 
+                           SET ban = "", active = 1
+                           WHERE email="{MAIL}" """.format(MAIL = escaped_mail)
+
+                cursor.execute(query)
+                db.commit()
+
+                return simple_response(200, "success", "%s is unbanned" % mail)
+
+            else:
+                return simple_response(403, 'error', "Already banned")
+
+        elif request.method == 'POST':
+
+            try:
+                timestamp = int(timestamp_input)  # Trying to get integer timestamp
+
+                if timestamp > int(time.time()):  # If we ban until future date
+
+                    query = """UPDATE users 
+                               SET ban = {DATE_TIME}
+                               WHERE email="{MAIL}" """.format(DATE_TIME = timestamp, MAIL = escaped_mail)
+
+                    cursor.execute(query)
+                    db.commit()
+
+                    return simple_response(200, "success", "%s is banned" % mail)
+
+                else:
+                    return simple_response(403, 'error', "You can't ban until time before now")
+
+            except ValueError:
+
+                if timestamp_input == 'PERM':  # To ban permanently
+
+                    query = """UPDATE user 
+                               SET active = 2
+                               WHERE email="{MAIL}" """.format(MAIL = escaped_mail)
+
+                    cursor.execute(query)
+                    db.commit()
+
+                    return simple_response(200, "success", "%s is banned permanently" % mail)
+
+                else:
+                    return simple_response(403, 'error', "Timestamp should be 10 digit positive integer or 'PERM'")
 
 
 @atexit.register    # Closing DB connection when app shunting down
