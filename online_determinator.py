@@ -147,6 +147,20 @@ def expires(days):
     return expires
 
 
+def auto_increment_number_finder(table_name):
+
+    query = """SELECT AUTO_INCREMENT
+               FROM information_schema.tables
+               WHERE
+               table_name = '{TABLE_NAME}'
+               AND table_schema = DATABASE()""".format(TABLE_NAME = table_name)
+
+    cursor.execute(query)
+    results = cursor.fetchall()
+    next_id = results[0][0]
+
+    return next_id
+
 project_mail = get_setting(path, 'Settings', 'project_mail')
 project_mail_password = get_setting(path, 'Settings', 'mail_password')
 project_salt = get_setting(path, 'Settings', 'salt')
@@ -193,7 +207,53 @@ def role_finder(cookies):  # Roles are 'user' or 'admin'. If resp['code'] == 200
             resp = {'role': results[0][0], 'code': 200, 'description': 'success', 'message': 'Role founded', 'email': results[0][2]}
             return resp
 
+
 ########################################################################################################################
+list_for_color = []  # id name L a b RGB
+list_for_pony_color = []  # color_id pony_id type_id
+
+next_color_id = auto_increment_number_finder('color')  # Next color id
+print(next_color_id)
+
+next_pony_id = auto_increment_number_finder('pony')  # Next pony id
+print(next_pony_id)
+
+pony_input = "{'pony_id': 4, 'pony_name': 'Pinkie Pie', 'body_part': {'body': [{'#F3B6CF': 'Амарантово-розовый'}], 'hair': [{'#ED458B': 'Глубокий пурпурно-розовый'}], 'eye': [{'#186F98': 'Небесно-синий'}, {'#82D1F4': 'Светло-голубой'}]}}"
+pony_object = json.loads(pony_input.replace("'", '"'))
+body_parts = list(pony_object['body_part'])  # ~~~Dark magic of converting dictionaries to lists~~~ .values()
+print(body_parts)
+
+for part in body_parts:
+    for color in pony_object['body_part'][part]:
+        key = list(color)[0]
+
+        query = """SELECT id
+                   FROM color
+                   WHERE RGB = '{RGB}'""".format(RGB = key)  # Search if that RGB color (key) already in DB
+        cursor.execute(query)
+        results = cursor.fetchall()
+        color_id = results[0][0]
+
+        if   part == 'body': body_part_id = 1
+        elif part == 'hair': body_part_id = 2
+        elif part == 'eye' : body_part_id = 3
+        elif part == 'wing': body_part_id = 4
+        else: raise ValueError
+
+        if not color_id:
+            Lab = RGBtoLab(color_retriever(key[1:]))
+            list_for_color.append({'id': next_color_id, 'name': color[key], 'L': Lab['L'], 'a': Lab['a'], 'b': Lab['b'], 'RGB': key})
+            list_for_pony_color.append({'color_id': next_color_id, 'pony_id': next_pony_id, 'type_id': body_part_id})
+            next_color_id = next_color_id + 1
+
+        else:
+            list_for_pony_color.append({'color_id': color_id, 'pony_id': next_pony_id, 'type_id': body_part_id})
+
+for i in range(len(list_for_color)):
+    print(list_for_color[i])
+
+for i in range(len(list_for_pony_color)):
+    print(list_for_pony_color[i])
 
 ########################################################################################################################
 
@@ -530,36 +590,59 @@ def pony_editor():
 
     else:  # If role is 'admin'
         if request.method == 'POST':  # adding
-            # parse 'pony object', disassemble it, create pony_object entry                                   DONE
-            # create lists of content for pony, color and pony_color,                                         PROCESSING
-            # search for same name and colors, modify list for pony_color
-            # add data
+
             pony_input = request.args.get('pony')
 
             try:
-                pony_object = json.loads(pony_input)
+                pony_object = json.loads(pony_input.replace("'", '"'))  # Change all ' to ". Because parser is dumb
 
             except:
-                try:
-                    pony_object = json.loads(pony_input.replace("'", '"'))  # Change all ' to ". Because parser is dumb.
+                return simple_response(403, "error", "Wrong pony object. You can see example on /api/get_all_ponies")
 
-                except:  # Here we come if input is not JSON
-                    return simple_response(403, "error", "Wrong pony object. You can see example on /api/get_all_ponies")
+            list_for_color      = []  # id name L a b RGB
+            list_for_pony_color = []  # color_id pony_id type_id
+            next_color_id       = auto_increment_number_finder('color')
+            next_pony_id        = auto_increment_number_finder('pony')
 
-            pony_object  = pony_object  # Now it's pony_object like:
-# {'pony_id': 4, 'pony_name': 'Pinkie Pie', 'body_part': {'body': [{'#F3B6CF': 'Амарантово-розовый'}], 'hair': [{'#ED458B': 'Глубокий пурпурно-розовый'}], 'eye': [{'#186F98': 'Небесно-синий'}, {'#82D1F4': 'Светло-голубой'}]}}
-            pony_name = pony_object['pony_name']
+            try:
+                # Pony_name and color_name should be escaped!!! ###############################################################################################################################################
+                # Make migration script for old columns ^^^
+                pony_name = pony_object['pony_name']
+                body_parts = list(pony_object['body_part'])  # ~~~Dark magic of converting dictionary keys to list~~~
 
-            query = """INSERT INTO pony (name) VALUES ("{NAME}") """.format(NAME = pony_name)
-            cursor.execute(query)
-            db.commit()
+                for part in body_parts:
+                    for color in pony_object['body_part'][part]:
+                        key = list(color)[0]
 
-            query = """SELECT id FROM pony WHERE name = "{NAME}" """.format(NAME = pony_name)
-            cursor.execute(query)
-            results = cursor.fetchall()
-            id = results[0][0]  # New pony's id
+                        query = """SELECT id FROM color WHERE RGB = '{RGB}'""".format(RGB = key)
+                        cursor.execute(query)  # Search if that RGB color (key) already in DB
+                        results = cursor.fetchall()
+                        color_id = results[0][0]
 
+                        if   part == 'body': body_part_id = 1
+                        elif part == 'hair': body_part_id = 2
+                        elif part == 'eye' : body_part_id = 3
+                        elif part == 'wing': body_part_id = 4
+                        else: raise ValueError
 
+                        if not color_id:
+                            Lab = RGBtoLab(color_retriever(key[1:]))
+                            list_for_color.append({'id': next_color_id, 'name': color[key], 'L': Lab['L'], 'a': Lab['a'], 'b': Lab['b'], 'RGB': key})
+                            list_for_pony_color.append({'color_id': next_color_id, 'pony_id': next_pony_id, 'type_id': body_part_id})
+                            next_color_id = next_color_id + 1
+
+                        else:
+                            list_for_pony_color.append({'color_id': color_id, 'pony_id': next_pony_id, 'type_id': body_part_id})
+
+            except:  # If data converting fails
+                return simple_response(403, "error", "Wrong pony object fields or values")
+
+# ################################################################ Here data insertion should go #################################################################
+            for i in range(len(list_for_color)):
+               print(list_for_color[i])
+
+            for i in range(len(list_for_pony_color)):
+                print(list_for_pony_color[i])
 
             return simple_response(200, "success", "Here comes pony adding")
 
