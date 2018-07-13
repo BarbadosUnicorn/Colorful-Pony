@@ -673,18 +673,20 @@ def pony_editor():
 
                 try:
                     new_data_dict = json.loads(new_data.replace("'", '"'))  # Change all ' to " because of parsers peculiar properties
-                    # replace_object = {'color': {'RGB_value': 'color_name'}, 'action': 'add' or 'replace' or 'delete', 'old_RGB': 'RGB_color' (only for replacing)}
+
+                    replace_object = {'color': {'RGB_value': 'color_name'}, 'action': 'add' or 'replace' or 'delete', 'old_RGB': 'RGB_color (only for replacing)'}
+
                     action = new_data_dict['action']
                     RGB_color = list(new_data_dict['color'])[0]
                     RGB_color_name = list(new_data_dict['color'].values())[0]
 
+                    query = """SELECT id FROM color WHERE RGB = '{RGB}'""".format(RGB = RGB_color)  # need to search for colors of pony WE NEED!!!
+                    cursor.execute(query)  # Search if that RGB color already in DB
+                    results = cursor.fetchall()
+                    color_id = results[0][0]
+
                     if action == 'add':
                         # search if it not already in DB
-
-                        query = """SELECT id FROM color WHERE RGB = '{RGB}'""".format(RGB = RGB_color)
-                        cursor.execute(query)  # Search if that RGB color already in DB
-                        results = cursor.fetchall()
-                        color_id = results[0][0]
 
                         if not color_id:  # If that color not found
 
@@ -704,7 +706,13 @@ def pony_editor():
 
 
                     elif action == 'delete':
-                        print()
+
+                        if color_id:
+                            print()
+
+                        else:
+                            return simple_response(403, "error", "No such color in DB")
+
 
 
 
@@ -717,14 +725,66 @@ def pony_editor():
             else:
                 return simple_response(403, "error", "Attribute should be body, hair, eye, wing or name")
 
-
         elif request.method == 'DELETE':  # deleting
-            return simple_response(200, "success", "Here is how pony become deleted")
 
-    query = '''DELETE s 
-               FROM spawnlist AS s 
-               INNER JOIN npc AS n ON s.npc_templateid = n.idTemplate 
-               WHERE n.type = "monster";'''
+            pony_id = request.args.get('id')
+
+            try:
+                pony_id = int(pony_id)
+                query = """SELECT name FROM pony WHERE id = {ID}""".format(ID = pony_id)
+                pony = cursor.execute(query)[0][0]
+
+                if not pony:
+                    return simple_response(403, "error", "No such pony in DB")
+
+                else:  # Get all color_id's that pony have
+
+                    query = """SELECT color.id
+                               FROM pony_color
+                               INNER JOIN color     ON pony_color.color_id = color.id
+                               WHERE pony_id = {ID}""".format(ID = pony_id)
+
+                    cursor.execute(query)
+                    color_id_list = cursor.fetchall()
+
+                    for id in color_id_list:  # For each color search for number of connections
+
+                        query =  """SELECT pony_id
+                                    FROM pony_color
+                                    WHERE color_id = {ID}""".format(ID = id)
+
+                        cursor.execute(query)
+                        results = cursor.fetchall()
+
+                        # Delete connection of pony we need
+                        query = """DELETE * 
+                                   FROM pony_color 
+                                   WHERE color_id = {COLOR_ID} AND pony_id = {PONY_ID}""".format(COLOR_ID = id,\
+                                                                                                 PONY_ID = pony_id)
+                        cursor.execute(query)
+                        db.commit()
+
+                        if len(results) == 1:  # If that color was only with this pony - delete it too
+
+                            query = """DELETE * 
+                                       FROM color 
+                                       WHERE color_id = {COLOR_ID}""".format(COLOR_ID = id)
+
+                            cursor.execute(query)
+                            db.commit()
+
+                    # Finally we delete pony
+                    query = """DELETE * 
+                               FROM pony 
+                               WHERE id = {PONY_ID}""".format(PONY_ID = pony_id)
+
+                    cursor.execute(query)
+                    db.commit()
+
+                    return simple_response(200, "success", "Pony removed successfully")
+
+            except:
+                return simple_response(403, "error", "ID should be integer")
 
 
 @app.route('/api/edit_role', methods = ['PUT'])    # Editing user roles in DB
