@@ -147,19 +147,39 @@ def expires(days):
     return expires
 
 
-def auto_increment_number_finder(table_name):
+def insert_machine(table_name, column_value_dict, output_column_name = None):  # Nice way to insert data in DB
 
-    query = """SELECT AUTO_INCREMENT
-               FROM information_schema.tables
-               WHERE
-               table_name = '{TABLE_NAME}'
-               AND table_schema = DATABASE()""".format(TABLE_NAME = table_name)
+    keys_list    = list(column_value_dict)
+    values_list  = list(column_value_dict.values())
+    first_column = keys_list[0]
+    first_value  = values_list[0]
+    value_str    = ''
+
+    for i in range(len(values_list)):
+        value_str = value_str + '"%s", ' %values_list[i]
+
+    value_str = value_str[0:-2]
+    column_str = str(keys_list)[1:-1]
+
+    query = """INSERT INTO {TABLE_NAME} ({COLUMN_NAME})
+               VALUES ({VALUE}) """.format(TABLE_NAME = table_name, COLUMN_NAME = column_str, VALUE = value_str)
 
     cursor.execute(query)
-    results = cursor.fetchall()
-    next_id = results[0][0]
+    db.commit()
 
-    return next_id
+    if output_column_name is None: pass
+
+    else:
+        query = """SELECT {OUTPUT_COLUMN_NAME}
+                   FROM {TABLE_NAME}
+                   WHERE {COLUMN_NAME} = "{VALUE}" """.format(OUTPUT_COLUMN_NAME = output_column_name,\
+                                     TABLE_NAME = table_name, COLUMN_NAME = first_column, VALUE = first_value)
+
+        cursor.execute(query)
+        results = cursor.fetchall()
+
+        return results[0][0]
+
 
 project_mail = get_setting(path, 'Settings', 'project_mail')
 project_mail_password = get_setting(path, 'Settings', 'mail_password')
@@ -168,7 +188,7 @@ URL = get_setting(path, 'Settings', 'URL')
 DB_password = get_setting(path, 'Settings', 'DB_password')
 
 db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
-                                       database="pony_color_db", charset="utf8") # Connecting to DB when app started
+                                       database="pony_color_db", charset="utf8")  # Connecting to DB when app started
 cursor = db.cursor()
 
 
@@ -206,56 +226,6 @@ def role_finder(cookies):  # Roles are 'user' or 'admin'. If resp['code'] == 200
         else:    # Here we come user logged in
             resp = {'role': results[0][0], 'code': 200, 'description': 'success', 'message': 'Role founded', 'email': results[0][2]}
             return resp
-
-
-########################################################################################################################
-list_for_color = []  # id name L a b RGB
-list_for_pony_color = []  # color_id pony_id type_id
-
-next_color_id = auto_increment_number_finder('color')  # Next color id
-print(next_color_id)
-
-next_pony_id = auto_increment_number_finder('pony')  # Next pony id
-print(next_pony_id)
-
-pony_input = "{'pony_id': 4, 'pony_name': 'Pinkie Pie', 'body_part': {'body': [{'#F3B6CF': 'Амарантово-розовый'}], 'hair': [{'#ED458B': 'Глубокий пурпурно-розовый'}], 'eye': [{'#186F98': 'Небесно-синий'}, {'#82D1F4': 'Светло-голубой'}]}}"
-pony_object = json.loads(pony_input.replace("'", '"'))
-body_parts = list(pony_object['body_part'])  # ~~~Dark magic of converting dictionaries to lists~~~ .values()
-print(body_parts)
-
-for part in body_parts:
-    for color in pony_object['body_part'][part]:
-        key = list(color)[0]
-
-        query = """SELECT id
-                   FROM color
-                   WHERE RGB = '{RGB}'""".format(RGB = key)  # Search if that RGB color (key) already in DB
-        cursor.execute(query)
-        results = cursor.fetchall()
-        color_id = results[0][0]
-
-        if   part == 'body': body_part_id = 1
-        elif part == 'hair': body_part_id = 2
-        elif part == 'eye' : body_part_id = 3
-        elif part == 'wing': body_part_id = 4
-        else: raise ValueError
-
-        if not color_id:
-            Lab = RGBtoLab(color_retriever(key[1:]))
-            list_for_color.append({'id': next_color_id, 'name': color[key], 'L': Lab['L'], 'a': Lab['a'], 'b': Lab['b'], 'RGB': key})
-            list_for_pony_color.append({'color_id': next_color_id, 'pony_id': next_pony_id, 'type_id': body_part_id})
-            next_color_id = next_color_id + 1
-
-        else:
-            list_for_pony_color.append({'color_id': color_id, 'pony_id': next_pony_id, 'type_id': body_part_id})
-
-for i in range(len(list_for_color)):
-    print(list_for_color[i])
-
-for i in range(len(list_for_pony_color)):
-    print(list_for_pony_color[i])
-
-########################################################################################################################
 
 
 @app.route('/api/get_pony_by_color')  # Function to find closest color in database.
@@ -470,7 +440,7 @@ def sign_in():
 
             response = simple_response(200, "success", "Signed in successfully")
             response.set_cookie('pony_color_determinator', value=value, max_age=None, expires=expire_date, path='/',\
-                                 domain=None, secure=False, httponly=False, samesite=None) # Because  .set_cookie() doesn't return 'response' object
+                                 domain=None, secure=False, httponly=False, samesite=None)  # Because  .set_cookie() doesn't return 'response' object
 
             if results[0][4] != '':  # If user was banned
 
@@ -495,7 +465,7 @@ def sign_out():
     if 'pony_color_determinator' in cookies:
         escaped_value = db.escape(cookies['pony_color_determinator'])
 
-        query = """DELETE FROM sessions WHERE value="{VALUE}" """.format(VALUE = escaped_value)    # Find user, hash and salt in DB
+        query = """DELETE FROM sessions WHERE value="{VALUE}" """.format(VALUE = escaped_value)
 
         cursor.execute(query)
         db.commit()
@@ -576,7 +546,7 @@ def pony_viewer():
         return str(response)
 
 
-@app.route('/api/edit_pony', methods = ['POST', 'PUT', 'DELETE'])    # Editing ponies data in DB
+@app.route('/api/edit_pony', methods = ['POST', 'PUT', 'DELETE'])  # Editing ponies data in DB
 def pony_editor():
 
     cookies = request.cookies
@@ -594,57 +564,73 @@ def pony_editor():
             pony_input = request.args.get('pony')
 
             try:
-                pony_object = json.loads(pony_input.replace("'", '"'))  # Change all ' to ". Because parser is dumb
+                pony_object = json.loads(pony_input.replace("'", '"'))  # Change all ' to " because of parsers peculiar properties
 
             except:
                 return simple_response(403, "error", "Wrong pony object. You can see example on /api/get_all_ponies")
 
-            list_for_color      = []  # id name L a b RGB
-            list_for_pony_color = []  # color_id pony_id type_id
-            next_color_id       = auto_increment_number_finder('color')
-            next_pony_id        = auto_increment_number_finder('pony')
-
             try:
-                # Pony_name and color_name should be escaped!!! ###############################################################################################################################################
-                # Make migration script for old columns ^^^
-                pony_name = pony_object['pony_name']
+                pony_name = pony_object['pony_name']  # Check if this pony already in DB (rise error)
+                escaped_pony_name = db.escape(pony_name)
+
+                query = """SELECT id FROM pony WHERE name = "{NAME}" """.format(NAME = escaped_pony_name)
+                results = cursor.execute(query)
+
+                if results[0][0]: raise ValueError  # If pony with such name is in DB - abort adding
+
                 body_parts = list(pony_object['body_part'])  # ~~~Dark magic of converting dictionary keys to list~~~
+                colors_and_connections = []
 
-                for part in body_parts:
+                for part in body_parts:  # Processing colors and creating list of things to add
+
+                    if   part == 'body': body_part_id = 1
+                    elif part == 'hair': body_part_id = 2
+                    elif part == 'eye' : body_part_id = 3
+                    elif part == 'wing': body_part_id = 4
+                    else: raise ValueError
+
                     for color in pony_object['body_part'][part]:
-                        key = list(color)[0]
 
-                        query = """SELECT id FROM color WHERE RGB = '{RGB}'""".format(RGB = key)
-                        cursor.execute(query)  # Search if that RGB color (key) already in DB
+                        RGB_color = list(color)[0]
+
+                        query = """SELECT id FROM color WHERE RGB = '{RGB}'""".format(RGB = RGB_color)
+                        cursor.execute(query)  # Search if that RGB color already in DB
                         results = cursor.fetchall()
                         color_id = results[0][0]
 
-                        if   part == 'body': body_part_id = 1
-                        elif part == 'hair': body_part_id = 2
-                        elif part == 'eye' : body_part_id = 3
-                        elif part == 'wing': body_part_id = 4
-                        else: raise ValueError
+                        if not color_id:  # If that color not found
 
-                        if not color_id:
-                            Lab = RGBtoLab(color_retriever(key[1:]))
-                            list_for_color.append({'id': next_color_id, 'name': color[key], 'L': Lab['L'], 'a': Lab['a'], 'b': Lab['b'], 'RGB': key})
-                            list_for_pony_color.append({'color_id': next_color_id, 'pony_id': next_pony_id, 'type_id': body_part_id})
-                            next_color_id = next_color_id + 1
+                            Lab = RGBtoLab(color_retriever(RGB_color[1:]))
+                            color_name = db.escape(color[RGB_color])
+                            color_dict = {'name': color_name, 'L': Lab['L'], 'a': Lab['a'], 'b': Lab['b'], 'RGB': RGB_color}
+                            pony_color_dict = {'color_id': None, 'pony_id': None, 'type_id': body_part_id}
 
-                        else:
-                            list_for_pony_color.append({'color_id': color_id, 'pony_id': next_pony_id, 'type_id': body_part_id})
+                            colors_and_connections.append({'color': color_dict, 'connection': pony_color_dict})
+
+                        else:  # If that color found
+                            pony_color_dict = {'color_id': color_id, 'pony_id': None, 'type_id': body_part_id}
+
+                            colors_and_connections.append({'color': None, 'connection': pony_color_dict})
+
+                new_pony_id = insert_machine('pony', {'name': escaped_pony_name}, 'id')  # From here pony adding starts
+
+                for color_to_add in colors_and_connections:
+
+                    color_to_add['connection']['pony_id'] = new_pony_id
+
+                    if color_to_add['color'] is not None:  # If new color should be added
+                        added_color_id = insert_machine('color', color_to_add['color'], 'id')  # Inserting color
+                        color_to_add['connection']['color_id'] = added_color_id
+
+                        insert_machine('pony_color', color_to_add['connection'])  # Inserting connections
+
+                    else:  # If color already in Db and we adding only new connection
+                        insert_machine('pony_color', color_to_add['connection'])  # Inserting connections
+
+                return simple_response(200, "success", "Pony added successfully")
 
             except:  # If data converting fails
                 return simple_response(403, "error", "Wrong pony object fields or values")
-
-# ################################################################ Here data insertion should go #################################################################
-            for i in range(len(list_for_color)):
-               print(list_for_color[i])
-
-            for i in range(len(list_for_pony_color)):
-                print(list_for_pony_color[i])
-
-            return simple_response(200, "success", "Here comes pony adding")
 
         elif request.method == 'PUT':  # editing
             return simple_response(200, "success", "Here comes pony editing")
