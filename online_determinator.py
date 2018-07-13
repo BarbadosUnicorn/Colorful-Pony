@@ -181,6 +181,22 @@ def insert_machine(table_name, column_value_dict, output_column_name = None):  #
         return results[0][0]
 
 
+def replace_machine(table_name, column_value_data_dict, column_value_key_dict):
+
+    data_column = list(column_value_data_dict)[0]
+    data_value  = list(column_value_data_dict.values())[0]
+    key_column  = list(column_value_key_dict)[0]
+    key_value   = list(column_value_key_dict.values())[0]
+
+    query = """UPDATE {TABLE_NAME}
+               SET {COLUMN_NAME}="{VALUE}"
+               WHERE {KEY_COLUMN}="{KEY_VALUE}" """.format(TABLE_NAME = table_name,\
+               COLUMN_NAME = data_column, VALUE = data_value, KEY_COLUMN = key_column, KEY_VALUE = key_value)
+
+    cursor.execute(query)
+    db.commit()
+
+
 project_mail = get_setting(path, 'Settings', 'project_mail')
 project_mail_password = get_setting(path, 'Settings', 'mail_password')
 project_salt = get_setting(path, 'Settings', 'salt')
@@ -633,7 +649,74 @@ def pony_editor():
                 return simple_response(403, "error", "Wrong pony object fields or values")
 
         elif request.method == 'PUT':  # editing
-            return simple_response(200, "success", "Here comes pony editing")
+
+            pony_id = request.args.get('id')
+            # search for this pony
+            query = """SELECT name FROM pony WHERE id = {ID}""".format(ID = pony_id)
+            pony = cursor.execute(query)[0][0]
+
+            if not pony:
+                return simple_response(403, "error", "No such pony in DB")
+
+            atribute_name = request.args.get('attribute')  # name or body part
+            new_data = request.args.get('data')
+
+            if atribute_name == 'name':
+                replace_machine('pony', {'name': new_data}, {'id': pony_id})
+
+            elif atribute_name == 'body' or 'hair' or 'eye' or 'wing':
+
+                if   atribute_name == 'body': body_part_id = 1
+                elif atribute_name == 'hair': body_part_id = 2
+                elif atribute_name == 'eye' : body_part_id = 3
+                else: body_part_id = 4
+
+                try:
+                    new_data_dict = json.loads(new_data.replace("'", '"'))  # Change all ' to " because of parsers peculiar properties
+                    # replace_object = {'color': {'RGB_value': 'color_name'}, 'action': 'add' or 'replace' or 'delete', 'old_RGB': 'RGB_color' (only for replacing)}
+                    action = new_data_dict['action']
+                    RGB_color = list(new_data_dict['color'])[0]
+                    RGB_color_name = list(new_data_dict['color'].values())[0]
+
+                    if action == 'add':
+                        # search if it not already in DB
+
+                        query = """SELECT id FROM color WHERE RGB = '{RGB}'""".format(RGB = RGB_color)
+                        cursor.execute(query)  # Search if that RGB color already in DB
+                        results = cursor.fetchall()
+                        color_id = results[0][0]
+
+                        if not color_id:  # If that color not found
+
+                            Lab = RGBtoLab(color_retriever(RGB_color[1:]))
+                            color_name = db.escape(RGB_color_name)
+                            color_dict = {'name': color_name, 'L': Lab['L'], 'a': Lab['a'], 'b': Lab['b'], 'RGB': RGB_color}
+                            pony_color_dict = {'color_id': None, 'pony_id': None, 'type_id': body_part_id}
+
+
+                        else:  # If that color found
+                            pony_color_dict = {'color_id': color_id, 'pony_id': None, 'type_id': body_part_id}
+
+
+                    elif action == 'replace':
+
+                        old_RGB = new_data_dict['old_RGB']
+
+
+                    elif action == 'delete':
+                        print()
+
+
+
+                except:
+                    return simple_response(403, "error", "Data should be JSON object like: {'color': {'RGB_value': 'color_name'}, 'action': 'add' or 'replace' or 'delete', 'old_RGB': 'RGB_color' (only for replacing)}")
+
+
+
+
+            else:
+                return simple_response(403, "error", "Attribute should be body, hair, eye, wing or name")
+
 
         elif request.method == 'DELETE':  # deleting
             return simple_response(200, "success", "Here is how pony become deleted")
