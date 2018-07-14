@@ -679,48 +679,120 @@ def pony_editor():
                     action = new_data_dict['action']
                     RGB_color = list(new_data_dict['color'])[0]
                     RGB_color_name = list(new_data_dict['color'].values())[0]
+                    Lab = RGBtoLab(color_retriever(RGB_color[1:]))
 
-                    query = """SELECT id FROM color WHERE RGB = '{RGB}'""".format(RGB = RGB_color)  # need to search for colors of pony WE NEED!!!
+                    query = """SELECT id FROM color WHERE RGB = '{RGB}'""".format(RGB = RGB_color)  # search if it already in DB
                     cursor.execute(query)  # Search if that RGB color already in DB
                     results = cursor.fetchall()
                     color_id = results[0][0]
 
                     if action == 'add':
-                        # search if it not already in DB
 
-                        if not color_id:  # If that color not found
-
-                            Lab = RGBtoLab(color_retriever(RGB_color[1:]))
+                        if not color_id:  # If that color not found - add color and connection
                             color_name = db.escape(RGB_color_name)
+
                             color_dict = {'name': color_name, 'L': Lab['L'], 'a': Lab['a'], 'b': Lab['b'], 'RGB': RGB_color}
-                            pony_color_dict = {'color_id': None, 'pony_id': None, 'type_id': body_part_id}
+                            added_color_id = insert_machine('color', color_dict, 'id')  # Inserting color
 
+                            pony_color_dict = {'color_id': added_color_id, 'pony_id': pony_id, 'type_id': body_part_id}
+                            insert_machine('pony_color', pony_color_dict)  # Inserting connection
 
-                        else:  # If that color found
-                            pony_color_dict = {'color_id': color_id, 'pony_id': None, 'type_id': body_part_id}
+                        else:  # If that color found - create connection
+                            pony_color_dict = {'color_id': color_id, 'pony_id': pony_id, 'type_id': body_part_id}
+                            insert_machine('pony_color', pony_color_dict)
+
+                        return simple_response(200, "success", "Pony's color added successfully")
 
 
                     elif action == 'replace':
 
                         old_RGB = new_data_dict['old_RGB']
 
+                        try:
+                            RGBtoLab(color_retriever(old_RGB[1:]))
+
+                            query = """SELECT id FROM color WHERE RGB = '{RGB}'""".format(RGB = old_RGB)  # search if old color in DB
+                            cursor.execute(query)
+                            results = cursor.fetchall()
+                            old_color_id = results[0][0]
+
+                            if not old_color_id:
+                                return simple_response(403, "error", "Can't replace non-existing object")
+
+                            else:  # Here come replacing
+
+                                query = """SELECT pony_id
+                                           FROM pony_color
+                                           WHERE color_id = {OLD_ID}""".format(OLD_ID = old_color_id)  # search for connections
+
+                                cursor.execute(query)
+                                results = cursor.fetchall()
+
+                                color_name = db.escape(RGB_color_name)
+
+                                if len(results) > 1:  # If this color belong to few pony's - change only for current: add color if nacessery and update connection
+                                    if not color_id:  # add color and connection
+                                        color_dict = {'name': color_name, 'L': Lab['L'], 'a': Lab['a'], 'b': Lab['b'], 'RGB': RGB_color}
+                                        added_color_id = insert_machine('color', color_dict, 'id')  # Inserting color
+                                        replace_machine('pony_color', {'color_id': added_color_id}, {'color_id': old_color_id})  # replacing connection
+
+                                    else:  # change connection
+                                        replace_machine('pony_color', {'color_id': color_id}, {'color_id': old_color_id})  # replacing connection
+
+                                else:  # that mean this color used only by this pony: change only color (delete old, add new, update connection)
+
+                                    query = """DELETE * 
+                                               FROM color 
+                                               WHERE color_id = {OLD_COLOR_ID}""".format(OLD_COLOR_ID = old_color_id)
+                                    cursor.execute(query)
+                                    db.commit()
+
+                                    color_dict = {'name': color_name, 'L': Lab['L'], 'a': Lab['a'], 'b': Lab['b'], 'RGB': RGB_color}
+                                    added_color_id = insert_machine('color', color_dict, 'id')  # Inserting color
+
+                                    replace_machine('pony_color', {'color_id': added_color_id}, {'color_id': old_color_id})  # replacing connection
+
+                                    return simple_response(200, "success", "Role edited")
+
+                        except:
+                            return simple_response(403, "error", "%s is not a RGB color" % str(old_RGB))
+
 
                     elif action == 'delete':
 
-                        if color_id:
-                            print()
+                        if color_id:  # If color in DB
+
+                            query = """SELECT pony_id
+                                       FROM pony_color
+                                       WHERE color_id = {ID}""".format(ID = color_id)  # search for connections
+
+                            cursor.execute(query)
+                            results = cursor.fetchall()
+
+                            # Delete connection of pony we need
+                            query = """DELETE * 
+                                       FROM pony_color 
+                                       WHERE color_id = {COLOR_ID} AND pony_id = {PONY_ID}""".format(COLOR_ID = color_id,\
+                                                                                                     PONY_ID = pony_id)
+                            cursor.execute(query)
+                            db.commit()
+
+                            if len(results) == 1:  # If that color was only with this pony - delete it too
+
+                                query = """DELETE * 
+                                           FROM color 
+                                           WHERE color_id = {COLOR_ID}""".format(COLOR_ID = color_id)
+
+                                cursor.execute(query)
+                                db.commit()
+
+                            return simple_response(200, "success", "Pony's color deleted successfully")
 
                         else:
                             return simple_response(403, "error", "No such color in DB")
 
-
-
-
                 except:
-                    return simple_response(403, "error", "Data should be JSON object like: {'color': {'RGB_value': 'color_name'}, 'action': 'add' or 'replace' or 'delete', 'old_RGB': 'RGB_color' (only for replacing)}")
-
-
-
+                    return simple_response(403, "error", "Data should be JSON object like: {'color': {'#FFFFFF': 'white'}, 'action': 'add' or 'replace' or 'delete', 'old_RGB': '#FBFBFB' (only for replacing)}")
 
             else:
                 return simple_response(403, "error", "Attribute should be body, hair, eye, wing or name")
