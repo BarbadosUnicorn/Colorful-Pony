@@ -153,13 +153,15 @@ def insert_machine(table_name, column_value_dict, output_column_name = None):  #
     values_list  = list(column_value_dict.values())
     first_column = keys_list[0]
     first_value  = values_list[0]
+    column_str   = ''
     value_str    = ''
 
     for i in range(len(values_list)):
+        column_str = column_str + '%s, ' %keys_list[i]
         value_str = value_str + '"%s", ' %values_list[i]
 
     value_str = value_str[0:-2]
-    column_str = str(keys_list)[1:-1]
+    column_str = column_str[0:-2]
 
     query = """INSERT INTO {TABLE_NAME} ({COLUMN_NAME})
                VALUES ({VALUE}) """.format(TABLE_NAME = table_name, COLUMN_NAME = column_str, VALUE = value_str)
@@ -488,8 +490,6 @@ def sign_out():
         return simple_response(200, "success", "Signed out successfully")
     else:
         return simple_response(403, "error", "Not authorised")
-
-########################################################################################################################
 
 
 @app.route('/api/get_all_ponies', methods = ['GET'])  # Function to view all ponies in DB

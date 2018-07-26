@@ -136,11 +136,15 @@ class online_determinator_test_case(unittest.TestCase):
         rv = self.signin(user1_mail, user1_password)
 
         rv = self.app.get('/api/get_all_ponies?page={PAGE}&ponies_per_page={PPP}'.format(PAGE = 2, PPP = 3))
-        print("DATA:")
         print(rv.data.decode())
+        self.assertEqual(rv._status_code, 200)
+
+
 
         rv = self.signout()
 
+
+pinkie_pie_data_dict = {'pony_id': 4, 'pony_name': "'Pinkie Pie'", 'body_part': {'body': [{'#F3B6CF': "'Амарантово-розовый'"}], 'hair': [{'#ED458B': "'Глубокий пурпурно-розовый'"}], 'eye': [{'#186F98': "'Небесно-синий'"}, {'#82D1F4': "'Светло-голубой'"}]}}
 
 @atexit.register    # Closing DB connection when app shunting down
 def teardown_db():
