@@ -24,6 +24,8 @@ def delete(table_name, key_dict):
 
 pony_dict_1 = dict(name='pony_1')
 pony_dict_2 = dict(name='pony_2')
+pony_dict_wrong = dict(second_name='pony_2')
+pony_dict_wrong_value = dict(name='pony_3')
 
 class online_determinator_unit_tests(unittest.TestCase):
 
@@ -68,32 +70,29 @@ class online_determinator_unit_tests(unittest.TestCase):
     def test_get_setting_Null_option(self):
         self.assertRaises(TypeError, online_determinator.get_setting, "settings.ini",  'Settings')
 
-    # Insert/replace - _machine's tests
+    # Insert_machine's tests
 
     def test_insert_machine_right_data(self):
         self.assertEqual(online_determinator.insert_machine('pony', pony_dict_1, 'id'), select('id', 'pony', pony_dict_1))
         delete('pony', pony_dict_1)
 
     def test_insert_machine_wrong_table(self):
-        print(ValueError.__class__)
-        print(ValueError.__dict__)
-        print(FileNotFoundError.__class__)
-        print(FileNotFoundError.__dict__)
-        print(configparser.NoOptionError.__class__)
-        print(configparser.NoOptionError.__dict__)
-        print(pymysql.err.ProgrammingError.__class__)
-        print(pymysql.err.ProgrammingError.__dict__)
-        self.assertRaises(pymysql.err.ProgrammingError, online_determinator.insert_machine('not_pony', pony_dict_1, 'id'))
+        with self.assertRaises(Exception) as context:
+            online_determinator.insert_machine('not_pony', pony_dict_1, 'id')
+        self.assertTrue("Table 'pony_color_db.not_pony' doesn't exist" in str(context.exception))
 
+    def test_insert_machine_wrong_column(self):
+        with self.assertRaises(Exception) as context:
+            online_determinator.insert_machine('pony', pony_dict_wrong, 'id')
+        self.assertTrue("Unknown column 'second_name' in 'field list'" in str(context.exception))
 
+    def test_insert_machine_wrong_output_column(self):
+        with self.assertRaises(Exception) as context:
+            online_determinator.insert_machine('pony', pony_dict_1, 'id_number')
+        self.assertTrue("Unknown column 'id_number' in 'field list'" in str(context.exception))
+        delete('pony', pony_dict_1)
 
-
-
-
-
-
-
-
+    # Replace_machine's tests
 
     def test_replace_machine_right_data(self):
         online_determinator.insert_machine('pony', pony_dict_1, 'id')
@@ -107,6 +106,32 @@ class online_determinator_unit_tests(unittest.TestCase):
         self.assertEqual(contain, True)
         delete('pony', pony_dict_2)
 
+    def test_replace_machine_wrong_tabe(self):
+        online_determinator.insert_machine('pony', pony_dict_1, 'id')
+        with self.assertRaises(Exception) as context:
+            online_determinator.replace_machine('not_pony', pony_dict_2, pony_dict_1)
+        self.assertTrue("Table 'pony_color_db.not_pony' doesn't exist" in str(context.exception))
+        delete('pony', pony_dict_1)
+
+    def test_replace_machine_wrong_new_data_column(self):
+        online_determinator.insert_machine('pony', pony_dict_1, 'id')
+        with self.assertRaises(Exception) as context:
+            online_determinator.replace_machine('pony', pony_dict_wrong, pony_dict_1)
+        self.assertTrue("Unknown column 'second_name' in 'field list'" in str(context.exception))
+        delete('pony', pony_dict_1)
+
+    def test_replace_machine_wrong_key_column(self):
+        online_determinator.insert_machine('pony', pony_dict_1, 'id')
+        with self.assertRaises(Exception) as context:
+            online_determinator.replace_machine('pony', pony_dict_2, pony_dict_wrong)
+        self.assertTrue("Unknown column 'second_name' in 'where clause'" in str(context.exception))
+        delete('pony', pony_dict_1)
+
+    def test_replace_machine_wrong_key_value(self):
+        id = online_determinator.insert_machine('pony', pony_dict_1, 'id')
+        online_determinator.replace_machine('pony', pony_dict_2, pony_dict_wrong_value)
+        self.assertEqual(id, select('id', 'pony', pony_dict_1 ))
+        delete('pony', pony_dict_1)
 
 
 if __name__ == '__main__':
