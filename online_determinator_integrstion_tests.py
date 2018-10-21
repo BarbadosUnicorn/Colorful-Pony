@@ -13,8 +13,12 @@ DB_password = online_determinator.get_setting(path, 'Settings', 'DB_password')
 
 user1_mail = online_determinator.get_setting(test_path, 'Users', 'user1_mail')
 user2_mail = online_determinator.get_setting(test_path, 'Users', 'user2_mail')
+user3_mail = online_determinator.get_setting(test_path, 'Users', 'user3_mail')
+user4_mail = online_determinator.get_setting(test_path, 'Users', 'user4_mail')
 user1_password = online_determinator.get_setting(test_path, 'Users', 'user1_password')
 user2_password = online_determinator.get_setting(test_path, 'Users', 'user2_password')
+user3_password = online_determinator.get_setting(test_path, 'Users', 'user3_password')
+user4_password = online_determinator.get_setting(test_path, 'Users', 'user4_password')
 
 db = pymysql.connect(host="127.0.0.1", port=3306, user="root", password=DB_password,\
                                        database="pony_color_db", charset="utf8")  # Connecting to DB when app started
@@ -64,8 +68,16 @@ class online_determinator_test_case(unittest.TestCase):
         rv = self.signin(user2_mail, user2_password)
         assert b'E-mail is not activated' in rv.data
 
+        rv = self.signin(user3_mail, user3_password)
+        assert b'You are banned until: 2118-01-01 00:00:00 UTC' in rv.data
+
+        rv = self.signin(user4_mail, user4_password)
+        assert b'You are banned permanently' in rv.data
+
         rv = self.signin(user1_mail, 'default')
         assert b'Wrong password' in rv.data
+
+        # Add tests for banned accounts!
 
     def test_getting_color(self):
         rv = self.signin(user1_mail, user1_password)
@@ -97,7 +109,7 @@ class online_determinator_test_case(unittest.TestCase):
         escaped_code = results[0][0]
         code = escaped_code[1: -1]
 
-        rv = self.app.get('/api/verify?code={CODE}'.format(CODE = code))
+        rv = self.app.post('/api/verify?code={CODE}'.format(CODE = code))
         self.assertEqual(rv._status_code, 200)
 
         query = """UPDATE users 
@@ -108,7 +120,7 @@ class online_determinator_test_case(unittest.TestCase):
         db.commit()
 
         code = code[1: -1]
-        rv = self.app.get('/api/verify?code={CODE}'.format(CODE = code))
+        rv = self.app.post('/api/verify?code={CODE}'.format(CODE = code))
         assert b'Invalid verification code.' in rv.data
 
     def test_signup(self):
@@ -139,12 +151,35 @@ class online_determinator_test_case(unittest.TestCase):
         print(rv.data.decode())
         self.assertEqual(rv._status_code, 200)
 
+        rv = self.app.get('/api/get_all_ponies?page={PAGE}&ponies_per_page={PPP}'.format(PAGE = 'blep', PPP = 3))
+        assert b"Page and ponies_per_page should be positive integer" in rv.data
 
+        rv = self.app.get('/api/get_all_ponies?page={PAGE}&ponies_per_page={PPP}'.format(PAGE = 2, PPP = 'melm'))
+        assert b"Page and ponies_per_page should be positive integer" in rv.data
+
+        rv = self.app.get('/api/get_all_ponies?page={PAGE}&ponies_per_page={PPP}'.format(PAGE = 0, PPP = 3))
+        assert b"Page and ponies_per_page should be positive integer" in rv.data
+
+        rv = self.app.get('/api/get_all_ponies?page={PAGE}&ponies_per_page={PPP}'.format(PAGE = 2, PPP = -3))
+        assert b"Page and ponies_per_page should be positive integer" in rv.data
+
+        rv = self.app.get('/api/get_all_ponies?page={PAGE}&ponies_per_page={PPP}'.format(PAGE = 100500, PPP = 9000))
+        assert b"There is only" in rv.data
+
+        rv = self.signout()
+
+    # Tests for administration routes:
+
+    def test_edit_pony(self):
+        rv = self.signin(user1_mail, user1_password)
+
+        print("Pony editing tests go here")
 
         rv = self.signout()
 
 
 pinkie_pie_data_dict = {'pony_id': 4, 'pony_name': "'Pinkie Pie'", 'body_part': {'body': [{'#F3B6CF': "'Амарантово-розовый'"}], 'hair': [{'#ED458B': "'Глубокий пурпурно-розовый'"}], 'eye': [{'#186F98': "'Небесно-синий'"}, {'#82D1F4': "'Светло-голубой'"}]}}
+
 
 @atexit.register    # Closing DB connection when app shunting down
 def teardown_db():

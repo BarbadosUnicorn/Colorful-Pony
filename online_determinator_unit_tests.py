@@ -133,6 +133,10 @@ class online_determinator_unit_tests(unittest.TestCase):
         self.assertEqual(id, select('id', 'pony', pony_dict_1 ))
         delete('pony', pony_dict_1)
 
+    # Role_finder's tests
+
+    def test_role_finder_right_data(self):
+        print()
 
 if __name__ == '__main__':
     unittest.main()

@@ -234,11 +234,13 @@ def role_finder(cookies):  # Roles are 'user' or 'admin'. If resp['code'] == 200
 
         elif results[0][3] == 2:  # Here we come user banned permanently
             resp['message'] = "You are banned permanently"
+            resp['code'] = 403
             return resp
 
         elif results[0][1] > int(time.time()):  # Here we come user banned
             resp['message'] = "You are banned until: %s UTC" \
                               %time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(results[0][1])))
+            resp['code'] = 403
             return resp
 
         else:    # Here we come user logged in
@@ -354,7 +356,7 @@ def user_creator():
         return simple_response(403, "error", "E-mail is not activated. Check your mailbox for new activation code. It may be in spam folder.")
 
 
-@app.route('/api/verify')    # Get verification code, activate user if E-mail and code match DB record.
+@app.route('/api/verify', methods = ['POST'])    # Get verification code, activate user if E-mail and code match DB record.
 def verification():
 
     verification_code = request.args.get('code')
@@ -435,7 +437,7 @@ def sign_in():
         return simple_response(403, "error", "You are banned until: %s UTC" \
                               %time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(results[0][4]))))
 
-    elif results[0][1] == 2:  # If user is banned permanently
+    elif results[0][0] == 2:  # If user is banned permanently
          return simple_response(403, "error", "You are banned permanently")
 
     else:  # If account activated - check password
@@ -479,6 +481,10 @@ def sign_in():
 def sign_out():
 
     cookies = request.cookies
+    role = role_finder(cookies)
+
+    if role['code'] == 403:
+        return simple_response(role['code'], role['description'], role['message'])
 
     if 'pony_color_determinator' in cookies:
         escaped_value = db.escape(cookies['pony_color_determinator'])
@@ -510,7 +516,7 @@ def pony_viewer():
             if page_number <= 0 or number_of_ponies <= 0: raise ValueError
 
         except ValueError:
-            return simple_response(403, "error", "Page and ponies_per_page should be integer")
+            return simple_response(403, "error", "Page and ponies_per_page should be positive integer")
 
         query = """SELECT id
                    FROM pony"""  # To get all pony_id's
@@ -1000,6 +1006,5 @@ def teardown_db():
     if db is not None:
         db.close()
         print('DATABASE CLOSED')
-
 
 # Address of fun: http://localhost:5000/api/get_pony_by_color?color=053550
