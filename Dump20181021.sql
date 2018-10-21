@@ -81,7 +81,7 @@ CREATE TABLE `pony` (
   `name` varchar(128) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -137,7 +137,7 @@ CREATE TABLE `sessions` (
   `time_stamp` varchar(29) NOT NULL,
   `user_id` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=95 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -146,7 +146,7 @@ CREATE TABLE `sessions` (
 
 LOCK TABLES `sessions` WRITE;
 /*!40000 ALTER TABLE `sessions` DISABLE KEYS */;
-INSERT INTO `sessions` VALUES (1,'\'R1hRjRdnkHOOmkN7ZksE7BHm7B6HWXPrUWtGa5YYoqf\'','Fri, 22-Jun-2018 19:03:36 GMT',18),(12,'\'MzRth7ukqvocAp87WBHtDNQMBvZ1rkmE92jTtPs5CUp\'','Fri, 22-Jun-2018 19:26:04 GMT',18),(13,'\'n4WGTVUggtFw7X1EmW5nh3LgZY5aNGvhZNel4LxoHbO\'','Fri, 22-Jun-2018 19:27:34 GMT',18),(14,'\'ggti3MC39A9JyUZRyG6rN24ztlfH5IBAcAbqUVlscXr\'','Fri, 22-Jun-2018 19:27:42 GMT',18),(18,'\'PLqRYYsPkQYiglt5wid6Q26StvMoY1GAY6LYSlNtLiY\'','Wed, 27-Jun-2018 17:22:06 GMT',18),(21,'\'EaLGlqIuKIOQoFBUtuqlKb0FTSsoJwPy3cdB98RFz2M\'','Wed, 27-Jun-2018 17:24:33 GMT',18),(29,'\'XNDwHyD9k3UAlA46sNNcqPSTUle2ClfaQp4j5M5lmhf\'','Wed, 27-Jun-2018 19:11:36 GMT',18),(30,'\'t78E189fSPspHJyAImtutCBFIvWVQZNJlJa8Q7JmjJT\'','Wed, 27-Jun-2018 19:13:30 GMT',18),(31,'\'NSCm55bLDiwb3yNwIUoCXJxIf0wLCg3TriDOal7udcz\'','Wed, 27-Jun-2018 19:15:34 GMT',18),(32,'\'atYEOI3Lhvpi3umP3H7jbfkdSk9ETTPR1VwpY4KxQ2O\'','Wed, 27-Jun-2018 19:16:54 GMT',18),(38,'\'nPBmNMm3pXi7JDxCdQmAJaJutud5KSlbVbyNIRVDGY6\'','Wed, 27-Jun-2018 19:21:32 GMT',18),(42,'\'Q7GZuq6E1nHg40yXnmoI7foLf8eIrARlXpSYw2soRrD\'','Wed, 27-Jun-2018 19:26:36 GMT',18),(43,'\'MS4f1b7HzMbxLUrz8UCzqFb2gkbanbwm3ikY4eRJVTS\'','Wed, 27-Jun-2018 19:27:53 GMT',18),(44,'\'hImrj60Zr9ztRbpP8f4pHGtoG3uxTRgj8mTuuORDQXP\'','Wed, 27-Jun-2018 19:28:42 GMT',18),(45,'\'uS7edfH1xZvNjhI5AIQ6HzQlcwtclzaThqSLMdhVLzq\'','Wed, 27-Jun-2018 19:32:21 GMT',18),(46,'\'PtGLVzspcEerEUJt1XBSwvmr4qJFAqj4FJCX5sTP5vy\'','Wed, 27-Jun-2018 19:36:53 GMT',18),(47,'\'QjE1V4kQI59KxRqXIUhiwGEFQK8ddMkK4D2YgdKhUT7\'','Wed, 27-Jun-2018 19:41:50 GMT',18),(48,'\'pW1AYsMEQqT5BE83TfSNhKmej7QeQUh9xPn0pNCFz2S\'','Wed, 27-Jun-2018 19:42:44 GMT',18),(49,'\'qKMxRJFjUyHc4gmb5SCZsiuE19TDYI0lqcCvt3HEhVw\'','Wed, 27-Jun-2018 19:44:17 GMT',18),(50,'\'T6SWD80qdUMZNuGn6WvwnSoGuxfBD3P8mW1lNnhvyoW\'','Wed, 27-Jun-2018 19:45:57 GMT',18),(51,'\'TIMGIZAdVGCUJsDBB4jkZ1rmERTz8eI1y3QPsu6Xhy2\'','Wed, 27-Jun-2018 19:46:54 GMT',18),(52,'\'P1NhnGaowiLxn0DrJUM3z3ZUIxSav3urqggmNctVQwm\'','Wed, 27-Jun-2018 19:47:37 GMT',18),(53,'\'ewUZKdyZirAyatw4q3JmaPybXraOEdBMGldzYUGC2p0\'','Wed, 27-Jun-2018 19:48:45 GMT',18),(54,'\'tEdSoqGbFmBGNvBq3DdsSZHzdrMQzJ9FZE6FB5Stnv3\'','Wed, 27-Jun-2018 19:51:13 GMT',18),(55,'\'H2c7tX4jS1QA1RJgTQrmPmBOSaDV1qWIHOnyhSI5YFU\'','Wed, 27-Jun-2018 19:53:10 GMT',18),(56,'\'xSjlYdq7YQNXutotde739GccBBFZgZBsarMIOuf0y7A\'','Wed, 27-Jun-2018 19:55:42 GMT',18),(57,'\'V6jhXtN4XL2f6EoWWKyNFStVBp0OYx19YVkx7CeSZxq\'','Wed, 27-Jun-2018 19:56:40 GMT',18),(58,'\'6DrcLvl957azui9AiF5RNeBi4NktC7iz2aNQzCJ3zuc\'','Wed, 27-Jun-2018 19:57:24 GMT',18),(59,'\'XXq4fE5UWrbkLudx3lmv6jlNX4Elq8vsRUciqfMfllq\'','Wed, 27-Jun-2018 19:58:28 GMT',18),(60,'\'oGgkyytBTLeNkI4r7pJugSsyZhJWEjIsTIOKcVaeM5p\'','Wed, 27-Jun-2018 19:59:52 GMT',18),(69,'\'03Wk2Pyzg4fGO6y09sB30rfG3uXNh2mZBgi3r9HCPas\'','Wed, 27-Jun-2018 20:19:45 GMT',18);
+INSERT INTO `sessions` VALUES (1,'\'R1hRjRdnkHOOmkN7ZksE7BHm7B6HWXPrUWtGa5YYoqf\'','Fri, 22-Jun-2018 19:03:36 GMT',18),(12,'\'MzRth7ukqvocAp87WBHtDNQMBvZ1rkmE92jTtPs5CUp\'','Fri, 22-Jun-2018 19:26:04 GMT',18),(13,'\'n4WGTVUggtFw7X1EmW5nh3LgZY5aNGvhZNel4LxoHbO\'','Fri, 22-Jun-2018 19:27:34 GMT',18),(14,'\'ggti3MC39A9JyUZRyG6rN24ztlfH5IBAcAbqUVlscXr\'','Fri, 22-Jun-2018 19:27:42 GMT',18),(18,'\'PLqRYYsPkQYiglt5wid6Q26StvMoY1GAY6LYSlNtLiY\'','Wed, 27-Jun-2018 17:22:06 GMT',18),(21,'\'EaLGlqIuKIOQoFBUtuqlKb0FTSsoJwPy3cdB98RFz2M\'','Wed, 27-Jun-2018 17:24:33 GMT',18),(29,'\'XNDwHyD9k3UAlA46sNNcqPSTUle2ClfaQp4j5M5lmhf\'','Wed, 27-Jun-2018 19:11:36 GMT',18),(30,'\'t78E189fSPspHJyAImtutCBFIvWVQZNJlJa8Q7JmjJT\'','Wed, 27-Jun-2018 19:13:30 GMT',18),(31,'\'NSCm55bLDiwb3yNwIUoCXJxIf0wLCg3TriDOal7udcz\'','Wed, 27-Jun-2018 19:15:34 GMT',18),(32,'\'atYEOI3Lhvpi3umP3H7jbfkdSk9ETTPR1VwpY4KxQ2O\'','Wed, 27-Jun-2018 19:16:54 GMT',18),(38,'\'nPBmNMm3pXi7JDxCdQmAJaJutud5KSlbVbyNIRVDGY6\'','Wed, 27-Jun-2018 19:21:32 GMT',18),(42,'\'Q7GZuq6E1nHg40yXnmoI7foLf8eIrARlXpSYw2soRrD\'','Wed, 27-Jun-2018 19:26:36 GMT',18),(43,'\'MS4f1b7HzMbxLUrz8UCzqFb2gkbanbwm3ikY4eRJVTS\'','Wed, 27-Jun-2018 19:27:53 GMT',18),(44,'\'hImrj60Zr9ztRbpP8f4pHGtoG3uxTRgj8mTuuORDQXP\'','Wed, 27-Jun-2018 19:28:42 GMT',18),(45,'\'uS7edfH1xZvNjhI5AIQ6HzQlcwtclzaThqSLMdhVLzq\'','Wed, 27-Jun-2018 19:32:21 GMT',18),(46,'\'PtGLVzspcEerEUJt1XBSwvmr4qJFAqj4FJCX5sTP5vy\'','Wed, 27-Jun-2018 19:36:53 GMT',18),(47,'\'QjE1V4kQI59KxRqXIUhiwGEFQK8ddMkK4D2YgdKhUT7\'','Wed, 27-Jun-2018 19:41:50 GMT',18),(48,'\'pW1AYsMEQqT5BE83TfSNhKmej7QeQUh9xPn0pNCFz2S\'','Wed, 27-Jun-2018 19:42:44 GMT',18),(49,'\'qKMxRJFjUyHc4gmb5SCZsiuE19TDYI0lqcCvt3HEhVw\'','Wed, 27-Jun-2018 19:44:17 GMT',18),(50,'\'T6SWD80qdUMZNuGn6WvwnSoGuxfBD3P8mW1lNnhvyoW\'','Wed, 27-Jun-2018 19:45:57 GMT',18),(51,'\'TIMGIZAdVGCUJsDBB4jkZ1rmERTz8eI1y3QPsu6Xhy2\'','Wed, 27-Jun-2018 19:46:54 GMT',18),(52,'\'P1NhnGaowiLxn0DrJUM3z3ZUIxSav3urqggmNctVQwm\'','Wed, 27-Jun-2018 19:47:37 GMT',18),(53,'\'ewUZKdyZirAyatw4q3JmaPybXraOEdBMGldzYUGC2p0\'','Wed, 27-Jun-2018 19:48:45 GMT',18),(54,'\'tEdSoqGbFmBGNvBq3DdsSZHzdrMQzJ9FZE6FB5Stnv3\'','Wed, 27-Jun-2018 19:51:13 GMT',18),(55,'\'H2c7tX4jS1QA1RJgTQrmPmBOSaDV1qWIHOnyhSI5YFU\'','Wed, 27-Jun-2018 19:53:10 GMT',18),(56,'\'xSjlYdq7YQNXutotde739GccBBFZgZBsarMIOuf0y7A\'','Wed, 27-Jun-2018 19:55:42 GMT',18),(57,'\'V6jhXtN4XL2f6EoWWKyNFStVBp0OYx19YVkx7CeSZxq\'','Wed, 27-Jun-2018 19:56:40 GMT',18),(58,'\'6DrcLvl957azui9AiF5RNeBi4NktC7iz2aNQzCJ3zuc\'','Wed, 27-Jun-2018 19:57:24 GMT',18),(59,'\'XXq4fE5UWrbkLudx3lmv6jlNX4Elq8vsRUciqfMfllq\'','Wed, 27-Jun-2018 19:58:28 GMT',18),(60,'\'oGgkyytBTLeNkI4r7pJugSsyZhJWEjIsTIOKcVaeM5p\'','Wed, 27-Jun-2018 19:59:52 GMT',18),(69,'\'03Wk2Pyzg4fGO6y09sB30rfG3uXNh2mZBgi3r9HCPas\'','Wed, 27-Jun-2018 20:19:45 GMT',18),(74,'\'nX751loCtRgl6U4nMFqwvSDj7wktxLERsKwYFNlZCMc\'','Mon, 22-Oct-2018 10:14:38 GMT',18),(75,'\'2ao0JPcYTMWKCKfha1SQfVuQpKIHiWXcD8GpHqywefS\'','Mon, 22-Oct-2018 10:32:45 GMT',23),(76,'\'z3Cjg4jdnxflXcnikOPuVhddFvQPCWodY0VA4J8s0LM\'','Mon, 22-Oct-2018 10:32:53 GMT',23),(77,'\'pPNX7fWNAFA0GHmrWu5hcVlbKF6PE40GHs85HIqUjA3\'','Mon, 22-Oct-2018 10:33:09 GMT',23);
 /*!40000 ALTER TABLE `sessions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -165,9 +165,9 @@ CREATE TABLE `users` (
   `verification_code` varchar(72) NOT NULL,
   `active` tinyint(1) NOT NULL,
   `role` varchar(16) NOT NULL,
-  `ban` int(10) NOT NULL,
+  `ban` bigint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -176,7 +176,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (18,'\'xtraand0ne@gmail.com\'','$2b$12$oG6OZeeyYArkO8uj/Drc4OdYgFjLuYj6Zh4kXLQM8RGcqoHmVjspy','UcM6V49fYOE29Iat15LVhIqtehn4qBRx','\'zMZAADT4S6aRhOhThtx8Uy8oXTatiQvVecgGN2w9TKkfYrlEWXkZtlGRQrDRYgbayt2BrR\'',1,'admin',0),(20,'\'pcolorfulpony@gmail.com\'','$2b$12$OHn/0k7sJaFlhPacQQaw..jY.OEJrcNDLTBOD1aclSi5wqzHb/GWu','F8TLpWaRgjkgpIKGFYUz3biwjoNT6gR5','\'gD2DBSpJ1pGVQO9jLuxMuKNjwFfbcRjcc4Yk0YDHdCM35dSuHZsxt001264NQgUFWqaSlT\'',0,'user',0);
+INSERT INTO `users` VALUES (18,'\'xtraand0ne@gmail.com\'','$2b$12$oG6OZeeyYArkO8uj/Drc4OdYgFjLuYj6Zh4kXLQM8RGcqoHmVjspy','UcM6V49fYOE29Iat15LVhIqtehn4qBRx','\'zMZAADT4S6aRhOhThtx8Uy8oXTatiQvVecgGN2w9TKkfYrlEWXkZtlGRQrDRYgbayt2BrR\'',1,'admin',0),(20,'\'pcolorfulpony@gmail.com\'','$2b$12$OHn/0k7sJaFlhPacQQaw..jY.OEJrcNDLTBOD1aclSi5wqzHb/GWu','F8TLpWaRgjkgpIKGFYUz3biwjoNT6gR5','\'L1aUahLch4uK9aTAVwQPHB12LWKy7aJnw742rAXa0lWa1wCcf2D6aCVoeIIXDRFuhHe99d\'',0,'user',0),(22,'\'temp.banned@gmail.com\'','$2b$12$4F8rUsDbuoqyfU758uJkyOPgA8Ml94EoYhuy28p1FqKkSQwxZUmYK','RPG5UxEyJoOSQAHkCCjTaEGZuJOLd4Bv','0',1,'user',4670438400),(23,'\'perm.banned@gmail.com\'','$2b$12$dNSzjFMyXELBLHiYILoJ.uZ1Pdr8htJ6vHUMuolbxT4QlauBGgvnC','8vMoqLZPjVF0sQjG47HTxdU92eOM1oPf','11',2,'user',0);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -189,4 +189,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2018-07-12 18:24:40
+-- Dump completed on 2018-10-21 14:44:57
